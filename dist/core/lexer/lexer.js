@@ -56,7 +56,7 @@ class Lexer {
                 // Handle words (Keywords and Identifiers)
                 if (this.isLetter(this.char)) {
                     const literal = this.readIdentifier();
-                    const keywords = ["let", "printf", "if", "const"];
+                    const keywords = ["let", "printf", "if", "const", "func"];
                     // Check if word is a Keyword or Identifier
                     const type = keywords.includes(literal) ? types_1.TokenType.Keyword : types_1.TokenType.Identifier;
                     return { type, value: literal };

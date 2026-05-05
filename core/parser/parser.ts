@@ -1,4 +1,4 @@
-import { Program, Statement, Expression, PrintStatement, VariableDeclaration, Comment } from "../ast/ast";
+import { Program, Statement, Expression, PrintStatement, VariableDeclaration, Comment, CallExpression } from "../ast/ast";
 import { TokenType, Token } from "../types/types";
 
 export class Parser {
@@ -49,16 +49,24 @@ export class Parser {
   private parseStatement(): Statement {
     const token = this.peek();
 
-    if (token.type === TokenType.Keyword && token.value === "let" || token.type === TokenType.Keyword && token.value === "const") {
-      return this.parseVariableDeclaration();
+    if (token.type === TokenType.Keyword) {
+    if (token.value === "let" || token.value === "const") return this.parseVariableDeclaration();
+    if (token.value === "printf") return this.parsePrintStatement();
+    if (token.value === "func") return this.parseFunctionDeclaration();
     }
-    
-    if (token.type === TokenType.Keyword && token.value === "printf") {
-      return this.parsePrintStatement();
+
+    if (token.type === TokenType.Identifier) {
+    return this.parseExpressionStatement();
     }
     
     throw new Error(`Unexpected token at statement level: ${token.value} (${token.type})`);
   }
+
+  private parseExpressionStatement(): any {
+  const expr = this.parseExpression();
+  if (this.peek().value === ";") this.advance(); // consume ";"
+  return expr; // In a simple AST, you can just return the expression node
+}
 
   private parseVariableDeclaration(): VariableDeclaration {
     this.advance(); // consume "let"
@@ -103,6 +111,53 @@ export class Parser {
     return { type: "Comment", value: token.value };
   }
 
+  private parseFunctionDeclaration(): Statement {
+    this.advance(); // consume "func"
+    const nameToken = this.advance(); // get function name
+    if (nameToken.type !== TokenType.Identifier) {
+      throw new Error("Expected function name after 'func'");
+    }
+
+    if (this.peek().value !== "(") {
+      throw new Error("Expected '(' after function name");
+    }
+    this.advance(); // consume "("
+
+    const parameters: string[] = [];
+    while (!this.isAtEnd() && this.peek().value !== ")") {
+      const paramToken = this.advance();
+      if (paramToken.type !== TokenType.Identifier) {
+        throw new Error("Expected parameter name in function declaration");
+      }
+      parameters.push(paramToken.value);
+      if (this.peek().value === ",") {
+        this.advance(); // consume ","
+      }
+    }
+    this.advance(); // consume ")"
+
+    const body = [];
+    if (this.peek().value === "{") {
+      this.advance();
+      while (!this.isAtEnd() && this.peek().value !== "}") {
+        body.push(this.parseStatement());
+      }
+      if (this.peek().value !== "}") {
+        throw new Error("Expected '}' at end of function body");
+      }
+      this.advance(); // consume "}"
+    } else {
+      throw new Error("Expected '{' to start function body");
+    }
+
+    return {
+      type: "Function",
+      name: nameToken.value,
+      parameters,
+      body
+    };
+  }
+
   private parseExpression(): Expression {
     let left = this.parsePrimary();
 
@@ -131,6 +186,23 @@ export class Parser {
     }
 
     if (token.type === TokenType.Identifier) {
+      if (this.peek().value === "(") {
+        // This is a function call, not just a variable reference
+        const funcName = token.value;
+        this.advance(); // consume "("
+        const args: Expression[] = [];
+        while (!this.isAtEnd() && this.peek().value !== ")") {
+          args.push(this.parseExpression());
+          if (this.peek().value === ",") {
+            this.advance(); // consume ","
+          }
+        }
+        this.advance(); // consume ")"
+
+        return { type: "CallExpression", callee: token.value, arguments: args };
+      }
+    
+      
       return { type: "Identifier", name: token.value };
     }
 

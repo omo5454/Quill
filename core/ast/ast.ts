@@ -31,6 +31,13 @@ export interface Comment {
   value: string;
 }
 
+export interface Function {
+  type: "Function";
+  name: string;
+  parameters: string[];
+  body: Statement[];
+}
+
 export interface Identifier {
   type: "Identifier";
   name: string;
@@ -41,5 +48,11 @@ export interface PrintStatement {
     expression: Expression; // Changed from 'identifier' to 'expression'
 }
 
-export type Statement = VariableDeclaration | PrintStatement;
-export type Expression = BinaryExpression | Literal | Identifier;
+export interface CallExpression {
+  type: "CallExpression";
+  callee: string;
+  arguments: Expression[];
+}
+
+export type Statement = VariableDeclaration | PrintStatement | Comment | Function | Expression;
+export type Expression = BinaryExpression | Literal | Identifier | CallExpression;

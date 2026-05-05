@@ -38,13 +38,24 @@ class Parser {
     }
     parseStatement() {
         const token = this.peek();
-        if (token.type === types_1.TokenType.Keyword && token.value === "let" || token.type === types_1.TokenType.Keyword && token.value === "const") {
-            return this.parseVariableDeclaration();
+        if (token.type === types_1.TokenType.Keyword) {
+            if (token.value === "let" || token.value === "const")
+                return this.parseVariableDeclaration();
+            if (token.value === "printf")
+                return this.parsePrintStatement();
+            if (token.value === "func")
+                return this.parseFunctionDeclaration();
         }
-        if (token.type === types_1.TokenType.Keyword && token.value === "printf") {
-            return this.parsePrintStatement();
+        if (token.type === types_1.TokenType.Identifier) {
+            return this.parseExpressionStatement();
         }
         throw new Error(`Unexpected token at statement level: ${token.value} (${token.type})`);
+    }
+    parseExpressionStatement() {
+        const expr = this.parseExpression();
+        if (this.peek().value === ";")
+            this.advance(); // consume ";"
+        return expr; // In a simple AST, you can just return the expression node
     }
     parseVariableDeclaration() {
         this.advance(); // consume "let"
@@ -79,6 +90,49 @@ class Parser {
         const token = this.advance(); // consume the comment token
         return { type: "Comment", value: token.value };
     }
+    parseFunctionDeclaration() {
+        this.advance(); // consume "func"
+        const nameToken = this.advance(); // get function name
+        if (nameToken.type !== types_1.TokenType.Identifier) {
+            throw new Error("Expected function name after 'func'");
+        }
+        if (this.peek().value !== "(") {
+            throw new Error("Expected '(' after function name");
+        }
+        this.advance(); // consume "("
+        const parameters = [];
+        while (!this.isAtEnd() && this.peek().value !== ")") {
+            const paramToken = this.advance();
+            if (paramToken.type !== types_1.TokenType.Identifier) {
+                throw new Error("Expected parameter name in function declaration");
+            }
+            parameters.push(paramToken.value);
+            if (this.peek().value === ",") {
+                this.advance(); // consume ","
+            }
+        }
+        this.advance(); // consume ")"
+        const body = [];
+        if (this.peek().value === "{") {
+            this.advance();
+            while (!this.isAtEnd() && this.peek().value !== "}") {
+                body.push(this.parseStatement());
+            }
+            if (this.peek().value !== "}") {
+                throw new Error("Expected '}' at end of function body");
+            }
+            this.advance(); // consume "}"
+        }
+        else {
+            throw new Error("Expected '{' to start function body");
+        }
+        return {
+            type: "Function",
+            name: nameToken.value,
+            parameters,
+            body
+        };
+    }
     parseExpression() {
         let left = this.parsePrimary();
         // ONLY continue if the next token is actually an Operator (+, -, *, /)
@@ -99,6 +153,20 @@ class Parser {
             return { type: "Literal", value: Number(token.value) };
         }
         if (token.type === types_1.TokenType.Identifier) {
+            if (this.peek().value === "(") {
+                // This is a function call, not just a variable reference
+                const funcName = token.value;
+                this.advance(); // consume "("
+                const args = [];
+                while (!this.isAtEnd() && this.peek().value !== ")") {
+                    args.push(this.parseExpression());
+                    if (this.peek().value === ",") {
+                        this.advance(); // consume ","
+                    }
+                }
+                this.advance(); // consume ")"
+                return { type: "CallExpression", callee: token.value, arguments: args };
+            }
             return { type: "Identifier", name: token.value };
         }
         throw new Error(`Expected number or variable, but got: ${token.value}`);

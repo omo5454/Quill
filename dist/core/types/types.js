@@ -12,4 +12,5 @@ var TokenType;
     TokenType["EOF"] = "EOF";
     TokenType["Illegal"] = "Illegal";
     TokenType["Comment"] = "Comment";
+    TokenType["Function"] = "Function";
 })(TokenType || (exports.TokenType = TokenType = {}));
