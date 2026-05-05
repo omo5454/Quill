@@ -1,0 +1,23 @@
+{
+  "name": "quill",
+  "version": "1.0.0",
+  "description": "An interperter to Quill",
+  "homepage": "https://github.com/omrimorgan5-hub/Quill#readme",
+  "bugs": {
+    "url": "https://github.com/omrimorgan5-hub/Quill/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/omrimorgan5-hub/Quill.git"
+  },
+  "license": "MIT",
+  "author": "Omri Morgan",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0"
+  }
+}
