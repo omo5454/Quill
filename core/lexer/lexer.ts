@@ -39,6 +39,15 @@ export class Lexer {
       case "+":
         this.readChar();
         return { type: TokenType.Operator, value: "+" };
+      case "-":
+        this.readChar();
+        return { type: TokenType.Operator, value: "-" };
+      case "*":
+        this.readChar();
+        return { type: TokenType.Operator, value: "*" };
+      case "/":
+        this.readChar();
+        return { type: TokenType.Operator, value: "/" };
       case ";":
         this.readChar();
         return { type: TokenType.Operator, value: ";" };

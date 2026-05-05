@@ -37,6 +37,15 @@ class Lexer {
             case "+":
                 this.readChar();
                 return { type: types_1.TokenType.Operator, value: "+" };
+            case "-":
+                this.readChar();
+                return { type: types_1.TokenType.Operator, value: "-" };
+            case "*":
+                this.readChar();
+                return { type: types_1.TokenType.Operator, value: "*" };
+            case "/":
+                this.readChar();
+                return { type: types_1.TokenType.Operator, value: "/" };
             case ";":
                 this.readChar();
                 return { type: types_1.TokenType.Operator, value: ";" };

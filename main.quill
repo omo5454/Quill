@@ -4,6 +4,6 @@ printf x + 5;
 
 let y = 15;
 
-let z = x + y;
+const z = x * y;
 
 printf z;

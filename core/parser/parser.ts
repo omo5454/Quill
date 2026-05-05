@@ -42,7 +42,7 @@ export class Parser {
   private parseStatement(): Statement {
     const token = this.peek();
 
-    if (token.type === TokenType.Keyword && token.value === "let") {
+    if (token.type === TokenType.Keyword && token.value === "let" || token.type === TokenType.Keyword && token.value === "const") {
       return this.parseVariableDeclaration();
     }
     

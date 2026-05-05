@@ -33,7 +33,7 @@ class Parser {
     }
     parseStatement() {
         const token = this.peek();
-        if (token.type === types_1.TokenType.Keyword && token.value === "let") {
+        if (token.type === types_1.TokenType.Keyword && token.value === "let" || token.type === types_1.TokenType.Keyword && token.value === "const") {
             return this.parseVariableDeclaration();
         }
         if (token.type === types_1.TokenType.Keyword && token.value === "printf") {
