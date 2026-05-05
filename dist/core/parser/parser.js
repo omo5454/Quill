@@ -27,6 +27,11 @@ class Parser {
                 this.advance();
                 continue;
             }
+            // Ignore comments at the top level; they are not part of the statement AST.
+            if (this.peek().type === types_1.TokenType.Comment) {
+                this.advance();
+                continue;
+            }
             program.body.push(this.parseStatement());
         }
         return program;
@@ -69,6 +74,10 @@ class Parser {
             this.advance();
         }
         return { type: "PrintStatement", expression: val };
+    }
+    parseComment() {
+        const token = this.advance(); // consume the comment token
+        return { type: "Comment", value: token.value };
     }
     parseExpression() {
         let left = this.parsePrimary();

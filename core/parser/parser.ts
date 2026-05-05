@@ -1,4 +1,4 @@
-import { Program, Statement, Expression, PrintStatement, VariableDeclaration } from "../ast/ast";
+import { Program, Statement, Expression, PrintStatement, VariableDeclaration, Comment } from "../ast/ast";
 import { TokenType, Token } from "../types/types";
 
 export class Parser {
@@ -33,6 +33,13 @@ export class Parser {
         this.advance();
         continue;
       }
+
+      // Ignore comments at the top level; they are not part of the statement AST.
+      if (this.peek().type === TokenType.Comment) {
+        this.advance();
+        continue;
+      }
+
       program.body.push(this.parseStatement());
     }
 
@@ -89,6 +96,11 @@ export class Parser {
     }
 
     return { type: "PrintStatement", expression: val };
+  }
+
+  private parseComment(): Comment {
+    const token = this.advance(); // consume the comment token
+    return { type: "Comment", value: token.value };
   }
 
   private parseExpression(): Expression {

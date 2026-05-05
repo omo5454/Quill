@@ -26,6 +26,11 @@ export interface Literal {
   value: number | string;
 }
 
+export interface Comment {
+  type: "Comment";
+  value: string;
+}
+
 export interface Identifier {
   type: "Identifier";
   name: string;

@@ -7,6 +7,7 @@ export enum TokenType {
     Punctuation = "Punctuation",
     EOF = "EOF",
     Illegal = "Illegal",
+    Comment = "Comment"
 }
 
 export interface Token {

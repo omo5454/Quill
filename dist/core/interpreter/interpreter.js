@@ -11,6 +11,9 @@ class Interpreter {
             case "Program":
                 node.body.forEach((stmt) => this.interpret(stmt));
                 return this.variables; // Return the final state of variables
+            case "Comment":
+                // Comments are ignored in execution
+                return;
             case "VariableDeclaration":
                 const val = this.interpret(node.value);
                 this.variables.set(node.identifier, val);

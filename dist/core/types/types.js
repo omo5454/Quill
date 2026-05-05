@@ -11,4 +11,5 @@ var TokenType;
     TokenType["Punctuation"] = "Punctuation";
     TokenType["EOF"] = "EOF";
     TokenType["Illegal"] = "Illegal";
+    TokenType["Comment"] = "Comment";
 })(TokenType || (exports.TokenType = TokenType = {}));

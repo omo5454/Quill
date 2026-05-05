@@ -51,6 +51,9 @@ export class Lexer {
       case ";":
         this.readChar();
         return { type: TokenType.Operator, value: ";" };
+      case "#":
+        const comment = this.readComment();
+        return { type: TokenType.Comment, value: comment };
       default:
         // Handle words (Keywords and Identifiers)
         if (this.isLetter(this.char)) {
@@ -90,6 +93,15 @@ export class Lexer {
       this.readChar();
     }
     return literal;
+  }
+
+  private readComment(): string {
+    let comment = "";
+    while (this.char !== null && this.char !== "\n") {
+      comment += this.char;
+      this.readChar();
+    }
+    return comment.trim();
   }
 
   private readNumber(): string {

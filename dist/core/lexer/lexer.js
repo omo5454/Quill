@@ -49,6 +49,9 @@ class Lexer {
             case ";":
                 this.readChar();
                 return { type: types_1.TokenType.Operator, value: ";" };
+            case "#":
+                const comment = this.readComment();
+                return { type: types_1.TokenType.Comment, value: comment };
             default:
                 // Handle words (Keywords and Identifiers)
                 if (this.isLetter(this.char)) {
@@ -82,6 +85,14 @@ class Lexer {
             this.readChar();
         }
         return literal;
+    }
+    readComment() {
+        let comment = "";
+        while (this.char !== null && this.char !== "\n") {
+            comment += this.char;
+            this.readChar();
+        }
+        return comment.trim();
     }
     readNumber() {
         let literal = "";
