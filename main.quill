@@ -1,0 +1,4 @@
+# this should be ignored
+
+let x = 5; # this should also be ignored
+printf x;

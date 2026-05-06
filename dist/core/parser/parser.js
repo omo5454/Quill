@@ -7,20 +7,28 @@ class Parser {
         this.current = 0;
         this.tokens = tokens;
     }
+    // Helper to look at current token without consuming it
     peek() {
         return this.tokens[this.current] || { type: types_1.TokenType.EOF, value: "" };
     }
+    // Helper to consume current token and move to next
     advance() {
         return this.tokens[this.current++];
     }
+    // Helper to check if we've reached the end
     isAtEnd() {
         return this.peek().type === types_1.TokenType.EOF;
     }
     parse() {
         const program = { type: "Program", body: [] };
         while (!this.isAtEnd()) {
-            const token = this.peek();
-            if (token.value === ";" || token.type === types_1.TokenType.Comment) {
+            // Ignore stand-alone semicolons between statements
+            if (this.peek().value === ";") {
+                this.advance();
+                continue;
+            }
+            // Ignore comments at the top level; they are not part of the statement AST.
+            if (this.peek().type === types_1.TokenType.Comment) {
                 this.advance();
                 continue;
             }
@@ -31,192 +39,255 @@ class Parser {
     parseStatement() {
         const token = this.peek();
         if (token.type === types_1.TokenType.Keyword) {
-            switch (token.value) {
-                case "let":
-                case "const":
-                    return this.parseVariableDeclaration();
-                case "printf":
-                    return this.parsePrintStatement();
-                case "func":
-                    return this.parseFunctionDeclaration();
-                case "if":
-                    return this.parseConditionalExpression();
-                case "while":
-                    return this.parseLoopExpression();
-            }
+            if (token.value === "let" || token.value === "const")
+                return this.parseVariableDeclaration();
+            if (token.value === "printf")
+                return this.parsePrintStatement();
+            if (token.value === "func")
+                return this.parseFunctionDeclaration();
+            if (token.value === "true" || token.value === "false")
+                return this.parseExpressionStatement();
+            if (token.value === ">" || token.value === "<" || token.value === ">=" || token.value === "<=" || token.value === "==" || token.value === "!=")
+                return this.parseExpressionStatement();
+            if (token.value === "&&" || token.value === "||" || token.value === "!")
+                return this.parseExpressionStatement();
+            if (token.value === "if")
+                return this.parseConditionalExpression();
+            if (token.value === "else")
+                return this.parseConditionalExpression();
+            if (token.value === "elif")
+                return this.parseConditionalExpression();
+            if (token.value === "while")
+                return this.parseLoopExpression();
         }
-        // Expression statements (function calls, identifiers, arrays, etc.)
-        return this.parseExpressionStatement();
+        if (token.type === types_1.TokenType.Identifier || token.value === "(") {
+            return this.parseExpressionStatement();
+        }
+        else if (token.type === types_1.TokenType.String) {
+            return this.parseExpressionStatement();
+        }
+        else if (token.type === types_1.TokenType.Loop) {
+            return this.parseLoopExpression();
+        }
+        throw new Error(`Unexpected token at statement level: ${token.value} (${token.type})`);
     }
     parseExpressionStatement() {
         const expr = this.parseExpression();
         if (this.peek().value === ";")
-            this.advance();
-        return expr;
+            this.advance(); // consume ";"
+        return expr; // In a simple AST, you can just return the expression node
+    }
+    parseString() {
+        const token = this.advance();
+        if (token.type !== types_1.TokenType.String) {
+            throw new Error(`Expected string literal, but got: ${token.value}`);
+        }
+        return { type: "String", value: token.value };
     }
     parseVariableDeclaration() {
-        this.advance(); // consume let/const
-        const id = this.advance();
-        if (id.type !== types_1.TokenType.Identifier)
-            throw new Error("Expected identifier");
-        if (this.peek().value !== "=")
-            throw new Error("Expected '='");
-        this.advance();
-        const value = this.parseExpression();
-        if (this.peek().value === ";")
-            this.advance();
-        return { type: "VariableDeclaration", identifier: id.value, value };
-    }
-    parsePrintStatement() {
-        this.advance(); // printf
-        const expression = this.parseExpression();
-        if (this.peek().value === ";")
-            this.advance();
-        return { type: "PrintStatement", expression };
-    }
-    parseFunctionDeclaration() {
-        this.advance(); // func
-        const nameToken = this.advance();
-        if (nameToken.type !== types_1.TokenType.Identifier)
-            throw new Error("Expected function name");
-        if (this.peek().value !== "(")
-            throw new Error("Expected '('");
-        this.advance();
-        const parameters = [];
-        while (this.peek().value !== ")") {
-            const param = this.advance();
-            if (param.type === types_1.TokenType.Identifier)
-                parameters.push(param.value);
-            if (this.peek().value === ",")
-                this.advance();
+        this.advance(); // consume "let"
+        const idToken = this.advance(); // get identifier (x)
+        if (idToken.type !== types_1.TokenType.Identifier) {
+            throw new Error("Expected variable name after 'let'");
         }
-        this.advance(); // )
-        if (this.peek().value !== "{")
-            throw new Error("Expected '{'");
-        this.advance();
+        if (this.peek().value !== "=") {
+            throw new Error("Expected '=' after variable name");
+        }
+        this.advance(); // consume "="
+        const val = this.parseExpression();
+        // Optional semicolon consumption
+        if (!this.isAtEnd() && this.peek().value === ";") {
+            this.advance();
+        }
+        return {
+            type: "VariableDeclaration",
+            identifier: idToken.value,
+            value: val
+        };
+    }
+    parseLoopExpression() {
+        this.advance(); // consume "while"
+        // 1. Parse the full condition (x < 15 && running == true)
+        const test = this.parseExpression();
+        // 2. Explicitly look for the opening brace
+        if (this.peek().value !== "{") {
+            // This is where your error was likely triggered
+            throw new Error(`Expected '{' to start loop body, but got: ${this.peek().value}`);
+        }
+        this.advance(); // consume "{"
         const body = [];
-        while (this.peek().value !== "}") {
+        while (!this.isAtEnd() && this.peek().value !== "}") {
             body.push(this.parseStatement());
         }
-        this.advance(); // }
-        return { type: "Function", name: nameToken.value, parameters, body };
+        if (this.peek().value !== "}") {
+            throw new Error("Expected '}' at end of loop body");
+        }
+        this.advance(); // consume "}"
+        return { type: "LoopExpression", test, body };
     }
     parseConditionalExpression() {
-        this.advance(); // if
+        const token = this.advance(); // consume "if" (or "elif")
+        // 1. Parse the condition
         const test = this.parseExpression();
-        if (this.peek().value !== "{")
-            throw new Error("Expected '{' after condition");
-        this.advance();
+        // 2. Parse the 'then' block
         const consequent = [];
-        while (this.peek().value !== "}") {
+        if (this.peek().value !== "{") {
+            throw new Error("Expected '{' to start block");
+        }
+        this.advance(); // consume "{"
+        while (!this.isAtEnd() && this.peek().value !== "}") {
             consequent.push(this.parseStatement());
         }
-        this.advance();
-        let alternate = undefined;
+        this.advance(); // consume "}"
+        // 3. Handle 'else' and 'elif'
+        let alternate;
         if (this.peek().value === "else") {
-            this.advance();
+            this.advance(); // consume "else"
             if (this.peek().value === "{") {
+                // Standard else block
                 this.advance();
                 const elseBody = [];
-                while (this.peek().value !== "}") {
+                while (!this.isAtEnd() && this.peek().value !== "}") {
                     elseBody.push(this.parseStatement());
                 }
-                this.advance();
+                this.advance(); // consume "}"
                 alternate = elseBody;
             }
             else if (this.peek().value === "if") {
-                alternate = this.parseConditionalExpression();
+                // This handles "else if" by recursion
+                alternate = [this.parseConditionalExpression()];
             }
         }
-        return { type: "ConditionalExpression", test, consequent, alternate };
+        return { type: "ConditionalExpression", test, consequent, alternate: alternate };
     }
-    parseLoopExpression() {
-        this.advance(); // while
-        const test = this.parseExpression();
-        if (this.peek().value !== "{")
-            throw new Error("Expected '{' after while condition");
-        this.advance();
-        const body = [];
-        while (this.peek().value !== "}") {
-            body.push(this.parseStatement());
+    parsePrintStatement() {
+        this.advance(); // consume "printf"
+        const val = this.parseExpression();
+        if (!this.isAtEnd() && this.peek().value === ";") {
+            this.advance();
         }
-        this.advance();
-        return { type: "LoopExpression", test, body };
+        return { type: "PrintStatement", expression: val };
+    }
+    parseComment() {
+        const token = this.advance(); // consume the comment token
+        return { type: "Comment", value: token.value };
+    }
+    parseFunctionDeclaration() {
+        this.advance(); // consume "func"
+        const nameToken = this.advance(); // get function name
+        if (nameToken.type !== types_1.TokenType.Identifier) {
+            throw new Error("Expected function name after 'func'");
+        }
+        if (this.peek().value !== "(") {
+            throw new Error("Expected '(' after function name");
+        }
+        this.advance(); // consume "("
+        const parameters = [];
+        while (!this.isAtEnd() && this.peek().value !== ")") {
+            const paramToken = this.advance();
+            if (paramToken.type !== types_1.TokenType.Identifier) {
+                throw new Error("Expected parameter name in function declaration");
+            }
+            parameters.push(paramToken.value);
+            if (this.peek().value === ",") {
+                this.advance(); // consume ","
+            }
+        }
+        this.advance(); // consume ")"
+        const body = [];
+        if (this.peek().value === "{") {
+            this.advance();
+            while (!this.isAtEnd() && this.peek().value !== "}") {
+                body.push(this.parseStatement());
+            }
+            if (this.peek().value !== "}") {
+                throw new Error("Expected '}' at end of function body");
+            }
+            this.advance(); // consume "}"
+        }
+        else {
+            throw new Error("Expected '{' to start function body");
+        }
+        return {
+            type: "Function",
+            name: nameToken.value,
+            parameters,
+            body
+        };
     }
     parseExpression() {
         let left = this.parsePrimary();
-        // Handle array indexing: list[0]
+        // ADD THIS: Handle Indexing (e.g., list)
         while (this.peek().value === "[") {
-            this.advance();
+            this.advance(); // consume "["
             const index = this.parseExpression();
             if (this.peek().value !== "]")
                 throw new Error("Expected ']'");
-            this.advance();
+            this.advance(); // consume "]"
             left = { type: "IndexExpression", object: left, index };
         }
-        // Binary operators
-        while (this.isBinaryOperator(this.peek())) {
+        // Your existing binary operator loop follows...
+        while (!this.isAtEnd() && this.isBinaryOperator(this.peek())) {
             const operator = this.advance().value;
-            const right = this.parseExpression(); // Changed to parseExpression for better precedence
+            const right = this.parsePrimary();
             left = { type: "BinaryExpression", left, operator, right };
         }
         return left;
     }
-    parsePrimary() {
-        const token = this.advance();
-        switch (token.type) {
-            case types_1.TokenType.Number:
-                return { type: "Literal", value: Number(token.value) };
-            case types_1.TokenType.String:
-                return { type: "String", value: token.value };
-            case types_1.TokenType.Identifier:
-                if (this.peek().value === "(") {
-                    return this.parseCallExpression(token.value);
-                }
-                return { type: "Identifier", name: token.value };
-            case types_1.TokenType.Keyword:
-                if (token.value === "true")
-                    return { type: "BooleanLiteral", value: true };
-                if (token.value === "false")
-                    return { type: "BooleanLiteral", value: false };
-                break;
-        }
-        if (token.value === "[") {
-            return this.parseArrayLiteral();
-        }
-        if (token.value === "(") {
-            const expr = this.parseExpression();
-            if (this.peek().value !== ")")
-                throw new Error("Expected ')'");
-            this.advance();
-            return expr;
-        }
-        throw new Error(`Unexpected token in primary: ${token.value}`);
-    }
-    parseCallExpression(callee) {
-        this.advance(); // consume "("
-        const args = [];
-        while (this.peek().value !== ")") {
-            args.push(this.parseExpression());
-            if (this.peek().value === ",")
-                this.advance();
-        }
-        this.advance(); // consume ")"
-        return { type: "CallExpression", callee, arguments: args };
-    }
-    parseArrayLiteral() {
-        const elements = [];
-        while (this.peek().value !== "]") {
-            elements.push(this.parseExpression());
-            if (this.peek().value === ",")
-                this.advance();
-        }
-        this.advance(); // consume "]"
-        return { type: "ArrayLiteral", elements };
-    }
+    // Helper to identify operators that join two expressions
     isBinaryOperator(token) {
         return token.type === types_1.TokenType.Operator &&
-            ["+", "-", "*", "/", "%", "==", "!=", ">", "<", ">=", "<=", "&&", "||"].includes(token.value);
+            ["+", "-", "*", "/", "==", "!=", ">", "<", ">=", "<=", "&&", "||"].includes(token.value);
+    }
+    // parsePrimary handles the "smallest" units: numbers and variables
+    parsePrimary() {
+        const token = this.advance();
+        if (token.type === types_1.TokenType.Number) {
+            return { type: "Literal", value: Number(token.value) };
+        }
+        if (token.value === "(") {
+            const expr = this.parseExpression(); // Parse everything inside
+            if (this.peek().value !== ")") {
+                throw new Error("Expected ')' after expression");
+            }
+            this.advance(); // consume ")"
+            return expr;
+        }
+        // ADD THIS: Handle Array Literals
+        if (token.value === "[") {
+            const elements = [];
+            if (this.peek().value !== "]") { // Handle non-empty array
+                while (!this.isAtEnd()) {
+                    elements.push(this.parseExpression());
+                    if (this.peek().value === ",") {
+                        this.advance(); // consume ","
+                    }
+                    else {
+                        break;
+                    }
+                }
+            }
+            if (this.peek().value !== "]") {
+                throw new Error("Expected ']' at end of array literal");
+            }
+            this.advance(); // consume "]"
+            return { type: "ArrayLiteral", elements };
+        }
+        if (token.type === types_1.TokenType.String) {
+            return { type: "String", value: token.value };
+        }
+        if (token.type === types_1.TokenType.Keyword) {
+            if (token.value === "true" || token.value === "false") {
+                return { type: "BooleanLiteral", value: token.value === "true" };
+            }
+        }
+        if (token.type === types_1.TokenType.Identifier) {
+            if (this.peek().value === "(") {
+                // ... your function call logic ...
+            }
+            return { type: "Identifier", name: token.value };
+        }
+        throw new Error(`Expected number or variable, but got: ${token.value}`);
     }
 }
 exports.Parser = Parser;

@@ -1,4 +1,3 @@
-// lexer.ts
 import { TokenType, Token } from "../types/types";
 
 export class Lexer {
@@ -6,11 +5,15 @@ export class Lexer {
   private char: string | null = "";
 
   constructor(private input: string) {
-    this.readChar();
+    this.readChar(); // Initialize the first character
   }
 
   private readChar() {
-    this.char = this.position >= this.input.length ? null : this.input[this.position];
+    if (this.position >= this.input.length) {
+      this.char = null;
+    } else {
+      this.char = this.input[this.position];
+    }
     this.position++;
   }
 
@@ -23,51 +26,49 @@ export class Lexer {
   public nextToken(): Token {
     this.skipWhitespace();
 
+    // Check for end of file first
     if (this.char === null) {
       return { type: TokenType.EOF, value: "" };
     }
 
-    // Single character operators / symbols
+    // Handle symbols and operators
     switch (this.char) {
       case "+":
-      case "-":
-      case "*":
-      case "/":
-      case "%":
-      case "(":
-      case ")":
-      case "[":
-      case "]":
-      case "{":
-      case "}":
-      case ";":
-        const op = this.char;
         this.readChar();
-        return { type: TokenType.Operator, value: op };
-
+        return { type: TokenType.Operator, value: "+" };
+      case "-":
+        this.readChar();
+        return { type: TokenType.Operator, value: "-" };
+      case "*":
+        this.readChar();
+        return { type: TokenType.Operator, value: "*" };
+      case "/":
+        this.readChar();
+        return { type: TokenType.Operator, value: "/" };
+      case ";":
+        this.readChar();
+        return { type: TokenType.Operator, value: ";" };
       case "#":
         const comment = this.readComment();
         return { type: TokenType.Comment, value: comment };
-
+        
       case '"':
-        return this.readString();
-
-      case "=":
-        this.readChar();
-        if (this.char === "=") {
+        this.readChar(); // Consume the opening quote
+        let strValue = "";
+        while (this.char !== null && this.char !== '"') {
+          if (this.char === '\\') { // Handle backslash
+            this.readChar();
+            // Optional: Add logic to handle \n, \t, etc.
+            strValue += this.char; 
+          } else {
+            strValue += this.char;
+          }
           this.readChar();
-          return { type: TokenType.Operator, value: "==" };
         }
-        return { type: TokenType.Operator, value: "=" };
+        this.readChar(); // Consume the closing quote
+        return { type: TokenType.String, value: strValue };
 
-      case "!":
-        this.readChar();
-        if ((this.char as string) === "=") {
-          this.readChar();
-          return { type: TokenType.Operator, value: "!=" };
-        }
-        return { type: TokenType.Operator, value: "!" };
-
+      
       case ">":
         this.readChar();
         if ((this.char as string) === "=") {
@@ -75,7 +76,6 @@ export class Lexer {
           return { type: TokenType.Operator, value: ">=" };
         }
         return { type: TokenType.Operator, value: ">" };
-
       case "<":
         this.readChar();
         if ((this.char as string) === "=") {
@@ -83,10 +83,24 @@ export class Lexer {
           return { type: TokenType.Operator, value: "<=" };
         }
         return { type: TokenType.Operator, value: "<" };
+      case "!":
+        this.readChar();
+        if ((this.char as string)  === "=") {
+          this.readChar();
+          return { type: TokenType.Operator, value: "!=" };
+        }
+        return { type: TokenType.Operator, value: "!" };
+      case "=":
+        this.readChar();
+        if ((this.char as string) === "=") {
+          this.readChar();
+          return { type: TokenType.Operator, value: "==" };
+        }
+        return { type: TokenType.Operator, value: "=" };
 
       case "&":
         this.readChar();
-        if (this.char === "&") {
+        if ((this.char as string) === "&") {
           this.readChar();
           return { type: TokenType.Operator, value: "&&" };
         }
@@ -94,64 +108,79 @@ export class Lexer {
 
       case "|":
         this.readChar();
-        if (this.char === "|") {
+        if ((this.char as string) === "|") {
           this.readChar();
           return { type: TokenType.Operator, value: "||" };
         }
         return { type: TokenType.Illegal, value: "|" };
 
-      default:
-        if (this.isLetter(this.char)) {
-          return this.readIdentifierOrKeyword();
-        }
-
-        if (this.isDigit(this.char)) {
-          return this.readNumber();
-        }
-
-        const illegal = this.char;
+      case "%":
         this.readChar();
-        return { type: TokenType.Illegal, value: illegal };
-    }
-  }
+        return { type: TokenType.Operator, value: "%" };
+      
+      case "[":
+        this.readChar();
+        return { type: TokenType.Operator, value: "[" };
+      case "]":
+        this.readChar();
+        return { type: TokenType.Operator, value: "]" };
 
-  private readString(): Token {
-    this.readChar(); // consume opening "
-    let value = "";
-
-    while (this.char !== null && this.char !== '"') {
-      if (this.char === '\\') {
-        this.readChar(); // skip escape char for now
-      }
-      value += this.char;
+      case "(":
+        this.readChar();
+        return { type: TokenType.Operator, value: "(" };
+      case ")":
+        this.readChar();
+        return { type: TokenType.Operator, value: ")" };
+      
+      case "{": // Add these if missing!
       this.readChar();
+      return { type: TokenType.Operator, value: "{" };
+    case "}":
+      this.readChar();
+      return { type: TokenType.Operator, value: "}" };
+      
+      default:
+        // Handle words (Keywords and Identifiers)
+        if (this.isLetter(this.char)) {
+          const literal = this.readIdentifier();
+          const keywords = ["let", "printf", "if", "const", "func", "true", "false", "else", "while", ">", "<", ">=", "<=", "==", "!=", "&&", "||", "!"];
+          
+          // Check if word is a Keyword or Identifier
+          const type = keywords.includes(literal) ? TokenType.Keyword : TokenType.Identifier;
+          return { type, value: literal };
+        }
+
+        
+        
+        
+        // Handle Numbers
+        if (this.isDigit(this.char)) {
+          const num = this.readNumber();
+          return { type: TokenType.Number, value: num };
+        }
+
+        // If we don't recognize it, it's an illegal character
+        const illegalChar = this.char || "";
+        this.readChar();
+        return { type: TokenType.Illegal, value: illegalChar };
     }
-    this.readChar(); // consume closing "
-    return { type: TokenType.String, value };
   }
 
-  private readIdentifierOrKeyword(): Token {
+  private isLetter(char: string | null): boolean {
+    return !!char && /[a-zA-Z_]/.test(char);
+  }
+
+  private isDigit(char: string | null): boolean {
+    return !!char && /[0-9]/.test(char);
+  }
+
+  private readIdentifier(): string {
     let literal = "";
-    while (this.char && /[a-zA-Z_]/.test(this.char)) {
+    while (this.isLetter(this.char)) {
       literal += this.char;
       this.readChar();
     }
-
-    const keywords = ["let", "const", "printf", "if", "else", "while", "func", "true", "false"];
-
-    return {
-      type: keywords.includes(literal) ? TokenType.Keyword : TokenType.Identifier,
-      value: literal
-    };
-  }
-
-  private readNumber(): Token {
-    let value = "";
-    while (this.char && /[0-9]/.test(this.char)) {
-      value += this.char;
-      this.readChar();
-    }
-    return { type: TokenType.Number, value };
+    return literal;
   }
 
   private readComment(): string {
@@ -163,11 +192,12 @@ export class Lexer {
     return comment.trim();
   }
 
-  private isLetter(char: string | null): boolean {
-    return !!char && /[a-zA-Z_]/.test(char);
-  }
-
-  private isDigit(char: string | null): boolean {
-    return !!char && /[0-9]/.test(char);
+  private readNumber(): string {
+    let literal = "";
+    while (this.isDigit(this.char)) {
+      literal += this.char;
+      this.readChar();
+    }
+    return literal;
   }
 }
