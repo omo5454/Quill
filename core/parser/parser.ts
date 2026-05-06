@@ -351,59 +351,67 @@ export class Parser {
   }
 
   // parsePrimary handles the "smallest" units: numbers and variables
-private parsePrimary(): Expression {
-  const token = this.peek(); // peek first, don't consume yet
+  private parsePrimary(): Expression {
+    const token = this.peek(); // peek first, don't consume yet
 
-  // Handle parenthesized expressions: (expr)
-  if (token.value === "(") {
-    this.advance(); // consume "("
-    const expr = this.parseExpression();
-    if (this.peek().value !== ")") {
-      throw new Error(`Expected ')' but got: ${this.peek().value}`);
-    }
-    this.advance(); // consume ")"
-    return expr;
-  }
-
-  // Now consume for all other cases
-  const consumed = this.advance();
-
-  if (consumed.type === TokenType.Number)
-    return { type: "Literal", value: Number(consumed.value) };
-
-  if (consumed.type === TokenType.Double)
-    return { type: "Double", value: parseFloat(consumed.value) };
-
-  if (consumed.type === TokenType.String)
-    return { type: "String", value: consumed.value };
-
-  if (consumed.type === TokenType.Keyword &&
-      (consumed.value === "true" || consumed.value === "false"))
-    return { type: "Literal", value: consumed.value === "true" ? 1 : 0 };
-
-  if (consumed.type === TokenType.Identifier) {
-    if (this.peek().value === "(") {
+    // Handle parenthesized expressions: (expr)
+    if (token.value === "(") {
       this.advance(); // consume "("
-      const args = [];
+      const expr = this.parseExpression();
       if (this.peek().value !== ")") {
-        while (true) {
-          args.push(this.parseExpression());
-          if (this.peek().value === ",") {
-            this.advance();
-          } else {
-            break;
-          }
-        }
-      }
-      if (this.peek().value !== ")") {
-        throw new Error(`Expected ')' after arguments, but got: ${this.peek().value}`);
+        throw new Error(`Expected ')' but got: ${this.peek().value}`);
       }
       this.advance(); // consume ")"
-      return { type: "CallExpression", callee: consumed.value, arguments: args };
+      return expr;
     }
-    return { type: "Identifier", name: consumed.value };
-  }
 
-  throw new Error(`Expected expression, but got: ${consumed.value}`);
-}
+    // Now consume for all other cases
+    const consumed = this.advance();
+
+    if (consumed.type === TokenType.Number)
+      return { type: "Literal", value: Number(consumed.value) };
+
+    if (consumed.type === TokenType.Double)
+      return { type: "Double", value: parseFloat(consumed.value) };
+
+    if (consumed.type === TokenType.String)
+      return { type: "String", value: consumed.value };
+
+    if (
+      consumed.type === TokenType.Keyword &&
+      (consumed.value === "true" || consumed.value === "false")
+    )
+      return { type: "Literal", value: consumed.value === "true" ? 1 : 0 };
+
+    if (consumed.type === TokenType.Identifier) {
+      if (this.peek().value === "(") {
+        this.advance(); // consume "("
+        const args = [];
+        if (this.peek().value !== ")") {
+          while (true) {
+            args.push(this.parseExpression());
+            if (this.peek().value === ",") {
+              this.advance();
+            } else {
+              break;
+            }
+          }
+        }
+        if (this.peek().value !== ")") {
+          throw new Error(
+            `Expected ')' after arguments, but got: ${this.peek().value}`,
+          );
+        }
+        this.advance(); // consume ")"
+        return {
+          type: "CallExpression",
+          callee: consumed.value,
+          arguments: args,
+        };
+      }
+      return { type: "Identifier", name: consumed.value };
+    }
+
+    throw new Error(`Expected expression, but got: ${consumed.value}`);
+  }
 }

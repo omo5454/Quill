@@ -46,22 +46,22 @@ export class Lexer {
         this.readChar();
         return { type: TokenType.Operator, value: "/" };
 
-      
       case "#":
         const comment = this.readComment();
         return { type: TokenType.Comment, value: comment };
       case ";":
         this.readChar();
         return { type: TokenType.Operator, value: ";" };
-        
+
       case '"':
         this.readChar(); // Consume the opening quote
         let strValue = "";
         while (this.char !== null && this.char !== '"') {
-          if (this.char === '\\') { // Handle backslash
+          if (this.char === "\\") {
+            // Handle backslash
             this.readChar();
             // Optional: Add logic to handle \n, \t, etc.
-            strValue += this.char; 
+            strValue += this.char;
           } else {
             strValue += this.char;
           }
@@ -93,7 +93,7 @@ export class Lexer {
         return { type: TokenType.Operator, value: "<" };
       case "!":
         this.readChar();
-        if ((this.char as string)  === "=") {
+        if ((this.char as string) === "=") {
           this.readChar();
           return { type: TokenType.Operator, value: "!=" };
         }
@@ -125,7 +125,7 @@ export class Lexer {
       case "%":
         this.readChar();
         return { type: TokenType.Operator, value: "%" };
-      
+
       case "[":
         this.readChar();
         return { type: TokenType.Operator, value: "[" };
@@ -139,35 +139,53 @@ export class Lexer {
       case ")":
         this.readChar();
         return { type: TokenType.Operator, value: ")" };
-      
+
       case "{": // Add these if missing!
-      this.readChar();
-      return { type: TokenType.Operator, value: "{" };
-    case "}":
-      this.readChar();
-      return { type: TokenType.Operator, value: "}" };
-      
+        this.readChar();
+        return { type: TokenType.Operator, value: "{" };
+      case "}":
+        this.readChar();
+        return { type: TokenType.Operator, value: "}" };
+
       default:
         // Handle words (Keywords and Identifiers)
         if (this.isLetter(this.char)) {
           const literal = this.readIdentifier();
-          const keywords = ["let", "printf", "if", "const", "func", "true", "false", "else", "while", ">", "<", ">=", "<=", "==", "!=", "&&", "||", "!"];
-          
+          const keywords = [
+            "let",
+            "printf",
+            "if",
+            "const",
+            "func",
+            "true",
+            "false",
+            "else",
+            "while",
+            ">",
+            "<",
+            ">=",
+            "<=",
+            "==",
+            "!=",
+            "&&",
+            "||",
+            "!",
+          ];
+
           // Check if word is a Keyword or Identifier
-          const type = keywords.includes(literal) ? TokenType.Keyword : TokenType.Identifier;
+          const type = keywords.includes(literal)
+            ? TokenType.Keyword
+            : TokenType.Identifier;
           return { type, value: literal };
         }
 
-        
-        
-        
         // Handle Numbers
         if (this.isDigit(this.char)) {
           const num = this.readNumber();
           return { type: TokenType.Number, value: num };
         }
 
-        if (this.isDouble(this.char)) { 
+        if (this.isDouble(this.char)) {
           const double = this.readNumber();
           return { type: TokenType.Double, value: double };
         }
@@ -184,7 +202,7 @@ export class Lexer {
   }
 
   private isDigit(char: string | null): boolean {
-    return !!char && /[0-9]/. test(char);
+    return !!char && /[0-9]/.test(char);
   }
 
   private isDouble(char: string | null): boolean {
