@@ -1,3 +1,4 @@
+// lexer.ts
 import { TokenType, Token } from "../types/types";
 
 export class Lexer {
@@ -5,15 +6,11 @@ export class Lexer {
   private char: string | null = "";
 
   constructor(private input: string) {
-    this.readChar(); // Initialize the first character
+    this.readChar();
   }
 
   private readChar() {
-    if (this.position >= this.input.length) {
-      this.char = null;
-    } else {
-      this.char = this.input[this.position];
-    }
+    this.char = this.position >= this.input.length ? null : this.input[this.position];
     this.position++;
   }
 
@@ -26,73 +23,135 @@ export class Lexer {
   public nextToken(): Token {
     this.skipWhitespace();
 
-    // Check for end of file first
     if (this.char === null) {
       return { type: TokenType.EOF, value: "" };
     }
 
-    // Handle symbols and operators
+    // Single character operators / symbols
     switch (this.char) {
-      case "=":
-        this.readChar(); // Consume the character
-        return { type: TokenType.Operator, value: "=" };
       case "+":
-        this.readChar();
-        return { type: TokenType.Operator, value: "+" };
       case "-":
-        this.readChar();
-        return { type: TokenType.Operator, value: "-" };
       case "*":
-        this.readChar();
-        return { type: TokenType.Operator, value: "*" };
       case "/":
-        this.readChar();
-        return { type: TokenType.Operator, value: "/" };
+      case "%":
+      case "(":
+      case ")":
+      case "[":
+      case "]":
+      case "{":
+      case "}":
       case ";":
+        const op = this.char;
         this.readChar();
-        return { type: TokenType.Operator, value: ";" };
+        return { type: TokenType.Operator, value: op };
+
       case "#":
         const comment = this.readComment();
         return { type: TokenType.Comment, value: comment };
+
+      case '"':
+        return this.readString();
+
+      case "=":
+        this.readChar();
+        if (this.char === "=") {
+          this.readChar();
+          return { type: TokenType.Operator, value: "==" };
+        }
+        return { type: TokenType.Operator, value: "=" };
+
+      case "!":
+        this.readChar();
+        if ((this.char as string) === "=") {
+          this.readChar();
+          return { type: TokenType.Operator, value: "!=" };
+        }
+        return { type: TokenType.Operator, value: "!" };
+
+      case ">":
+        this.readChar();
+        if ((this.char as string) === "=") {
+          this.readChar();
+          return { type: TokenType.Operator, value: ">=" };
+        }
+        return { type: TokenType.Operator, value: ">" };
+
+      case "<":
+        this.readChar();
+        if ((this.char as string) === "=") {
+          this.readChar();
+          return { type: TokenType.Operator, value: "<=" };
+        }
+        return { type: TokenType.Operator, value: "<" };
+
+      case "&":
+        this.readChar();
+        if (this.char === "&") {
+          this.readChar();
+          return { type: TokenType.Operator, value: "&&" };
+        }
+        return { type: TokenType.Illegal, value: "&" };
+
+      case "|":
+        this.readChar();
+        if (this.char === "|") {
+          this.readChar();
+          return { type: TokenType.Operator, value: "||" };
+        }
+        return { type: TokenType.Illegal, value: "|" };
+
       default:
-        // Handle words (Keywords and Identifiers)
         if (this.isLetter(this.char)) {
-          const literal = this.readIdentifier();
-          const keywords = ["let", "printf", "if", "const", "func"];
-          
-          // Check if word is a Keyword or Identifier
-          const type = keywords.includes(literal) ? TokenType.Keyword : TokenType.Identifier;
-          return { type, value: literal };
-        } 
-        
-        // Handle Numbers
-        if (this.isDigit(this.char)) {
-          const num = this.readNumber();
-          return { type: TokenType.Number, value: num };
+          return this.readIdentifierOrKeyword();
         }
 
-        // If we don't recognize it, it's an illegal character
-        const illegalChar = this.char;
+        if (this.isDigit(this.char)) {
+          return this.readNumber();
+        }
+
+        const illegal = this.char;
         this.readChar();
-        return { type: TokenType.Illegal, value: illegalChar };
+        return { type: TokenType.Illegal, value: illegal };
     }
   }
 
-  private isLetter(char: string | null): boolean {
-    return !!char && /[a-zA-Z_]/.test(char);
+  private readString(): Token {
+    this.readChar(); // consume opening "
+    let value = "";
+
+    while (this.char !== null && this.char !== '"') {
+      if (this.char === '\\') {
+        this.readChar(); // skip escape char for now
+      }
+      value += this.char;
+      this.readChar();
+    }
+    this.readChar(); // consume closing "
+    return { type: TokenType.String, value };
   }
 
-  private isDigit(char: string | null): boolean {
-    return !!char && /[0-9]/.test(char);
-  }
-
-  private readIdentifier(): string {
+  private readIdentifierOrKeyword(): Token {
     let literal = "";
-    while (this.isLetter(this.char)) {
+    while (this.char && /[a-zA-Z_]/.test(this.char)) {
       literal += this.char;
       this.readChar();
     }
-    return literal;
+
+    const keywords = ["let", "const", "printf", "if", "else", "while", "func", "true", "false"];
+
+    return {
+      type: keywords.includes(literal) ? TokenType.Keyword : TokenType.Identifier,
+      value: literal
+    };
+  }
+
+  private readNumber(): Token {
+    let value = "";
+    while (this.char && /[0-9]/.test(this.char)) {
+      value += this.char;
+      this.readChar();
+    }
+    return { type: TokenType.Number, value };
   }
 
   private readComment(): string {
@@ -104,12 +163,11 @@ export class Lexer {
     return comment.trim();
   }
 
-  private readNumber(): string {
-    let literal = "";
-    while (this.isDigit(this.char)) {
-      literal += this.char;
-      this.readChar();
-    }
-    return literal;
+  private isLetter(char: string | null): boolean {
+    return !!char && /[a-zA-Z_]/.test(char);
+  }
+
+  private isDigit(char: string | null): boolean {
+    return !!char && /[0-9]/.test(char);
   }
 }

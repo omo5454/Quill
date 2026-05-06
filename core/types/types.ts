@@ -8,7 +8,10 @@ export enum TokenType {
     EOF = "EOF",
     Illegal = "Illegal",
     Comment = "Comment",
-    Function = "Function"
+    Function = "Function",
+    Boolean = "Boolean",
+    Conditional = "Conditional",
+    Loop = "Loop"
 }
 
 export interface Token {

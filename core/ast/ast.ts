@@ -31,11 +31,21 @@ export interface Comment {
   value: string;
 }
 
+export interface String {
+  type: "String";
+  value: string;
+}
+
 export interface Function {
   type: "Function";
   name: string;
   parameters: string[];
   body: Statement[];
+}
+
+export interface BooleanLiteral {
+  type: "BooleanLiteral";
+  value: boolean;
 }
 
 export interface Identifier {
@@ -48,11 +58,68 @@ export interface PrintStatement {
     expression: Expression; // Changed from 'identifier' to 'expression'
 }
 
+export interface ArrayLiteral {
+  type: "ArrayLiteral";
+  elements: Expression[];
+}
+
 export interface CallExpression {
   type: "CallExpression";
   callee: string;
   arguments: Expression[];
 }
 
-export type Statement = VariableDeclaration | PrintStatement | Comment | Function | Expression;
-export type Expression = BinaryExpression | Literal | Identifier | CallExpression;
+export interface ComparisonExpression {
+  type: "ComparisonExpression";
+  left: Expression;
+  operator: string; // e.g., "==", "!=", "<", ">", "<=", ">="
+  right: Expression;
+}
+
+export interface ConditionalExpression {
+  type: "ConditionalExpression";
+  test: Expression; // The condition to evaluate
+  consequent: Statement[]; // Statements to execute if condition is true
+  alternate: Statement[]; // Statements to execute if condition is false (optional)
+}
+
+export interface LoopExpression {
+  type: "LoopExpression";
+  test: Expression; // The condition to evaluate before each iteration
+  body: Statement[]; // Statements to execute in each iteration
+}
+
+export interface IndexExpression {
+  type: "IndexExpression";
+  object: Expression; // The array or object being indexed
+  index: Expression; // The index or key being accessed
+}
+
+export type Statement = 
+VariableDeclaration 
+| PrintStatement 
+| Comment 
+| Function 
+| Expression 
+| String 
+| BooleanLiteral
+| CallExpression
+| ComparisonExpression
+| ConditionalExpression
+| LoopExpression
+| ArrayLiteral
+| IndexExpression;
+
+
+export type Expression = 
+BinaryExpression 
+| Literal 
+| Identifier 
+| CallExpression 
+| String 
+| BooleanLiteral
+| ComparisonExpression
+| ConditionalExpression
+| LoopExpression
+| ArrayLiteral
+| IndexExpression;

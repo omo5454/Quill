@@ -13,4 +13,7 @@ var TokenType;
     TokenType["Illegal"] = "Illegal";
     TokenType["Comment"] = "Comment";
     TokenType["Function"] = "Function";
+    TokenType["Boolean"] = "Boolean";
+    TokenType["Conditional"] = "Conditional";
+    TokenType["Loop"] = "Loop";
 })(TokenType || (exports.TokenType = TokenType = {}));
