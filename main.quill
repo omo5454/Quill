@@ -1,15 +1,11 @@
-# this should be ignored
-let i = 0;
-let x = 5; # this should also be ignored
-printf(x + 15);
+let time = timeNow();
+let name = "Omri";
 
-printf(x + 5);
+printf(time);
 
-# let i = i + 1;
-# // this should be ignored
-# // printf(x);
-while x >= i{
-    printf(x);
-    # let i = i + 1;
-    let x = x - 1;
+func greet(arg){
+
+    printf("Hello ");
 }
+
+greet(name);

@@ -45,6 +45,7 @@ export class Lexer {
       case "/":
         this.readChar();
         return { type: TokenType.Operator, value: "/" };
+
       
       case "#":
         const comment = this.readComment();
@@ -69,7 +70,13 @@ export class Lexer {
         this.readChar(); // Consume the closing quote
         return { type: TokenType.String, value: strValue };
 
-      
+      case ".": // Handle double literals
+        this.readChar();
+        if (this.isDigit(this.char)) {
+          const doubleValue = this.readNumber();
+          return { type: TokenType.Double, value: doubleValue };
+        }
+        return { type: TokenType.Illegal, value: "." };
       case ">":
         this.readChar();
         if ((this.char as string) === "=") {
@@ -160,6 +167,11 @@ export class Lexer {
           return { type: TokenType.Number, value: num };
         }
 
+        if (this.isDouble(this.char)) { 
+          const double = this.readNumber();
+          return { type: TokenType.Double, value: double };
+        }
+
         // If we don't recognize it, it's an illegal character
         const illegalChar = this.char || "";
         this.readChar();
@@ -172,6 +184,14 @@ export class Lexer {
   }
 
   private isDigit(char: string | null): boolean {
+    return !!char && /[0-9]/. test(char);
+  }
+
+  private isDouble(char: string | null): boolean {
+    return !!char && /[0-9.]/.test(char);
+  }
+
+  private isInteger(char: string | null): boolean {
     return !!char && /[0-9]/.test(char);
   }
 

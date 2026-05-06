@@ -36,6 +36,16 @@ export interface String {
   value: string;
 }
 
+export interface Double {
+  type: "Double";
+  value: number;
+}
+
+export interface Integer {
+  type: "Integer";
+  value: number;
+}
+
 export interface Function {
   type: "Function";
   name: string;
@@ -108,7 +118,9 @@ VariableDeclaration
 | ConditionalExpression
 | LoopExpression
 | ArrayLiteral
-| IndexExpression;
+| IndexExpression
+| Double
+| Integer;
 
 
 export type Expression = 
@@ -122,4 +134,6 @@ BinaryExpression
 | ConditionalExpression
 | LoopExpression
 | ArrayLiteral
-| IndexExpression;
+| IndexExpression
+| Double
+| Integer;

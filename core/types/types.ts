@@ -4,6 +4,7 @@ export enum TokenType {
     String = "String",
     Operator = "Operator",
     Keyword = "Keyword",
+    Double = "Double",
     Punctuation = "Punctuation",
     EOF = "EOF",
     Illegal = "Illegal",
@@ -11,10 +12,12 @@ export enum TokenType {
     Function = "Function",
     Boolean = "Boolean",
     Conditional = "Conditional",
-    Loop = "Loop"
+    Loop = "Loop",
+    Integer = "Integer",
 }
 
 export interface Token {
     type: TokenType;
     value: string;
 }
+

@@ -57,31 +57,36 @@ export class Interpreter {
       
       case "CallExpression":
         const functionData = this.variables.get(node.callee);
+        if (!functionData) throw new Error(`Runtime Error: '${node.callee}' is not defined.`);
 
-          if (!functionData) {
-            throw new Error(`Runtime Error: '${node.callee}' is not defined.`);
-          }
+        const args = node.arguments.map((arg: any) => this.interpret(arg));
 
-          // Evaluate arguments first
-          const args = node.arguments.map((arg: any) => this.interpret(arg));
+        if (functionData.type === "built-in-function") {
+          return functionData.fn(args);
+        }
 
-          // Handle Standard Library (Built-ins)
-          if (functionData.type === "built-in-function") {
-            return functionData.fn(args);
-          }
+        if (functionData.type === "user-defined-function") {
+          // 1. Save the previous scope
+          const previousScope = new Map(this.variables); 
 
-          // Handle User Functions
-          if (functionData.type === "user-defined-function") {
+          try {
+            // 2. Map arguments to parameter names in the current scope
             functionData.parameters.forEach((paramName: string, index: number) => {
               this.variables.set(paramName, args[index]);
             });
 
+            // 3. Execute the body
             let lastResult = null;
-            functionData.body.forEach((stmt: any) => {
+            for (const stmt of functionData.body) {
               lastResult = this.interpret(stmt);
-            });
+            }
             return lastResult;
+          } finally {
+            // 4. Restore the scope so function variables don't leak out
+            this.variables = previousScope;
           }
+        }
+
 
           throw new Error(`Runtime Error: '${node.callee}' is not a function.`);
 
@@ -113,12 +118,22 @@ export class Interpreter {
         const funcData = {
           parameters: node.parameters,
           body: node.body,
+          closure: new Map(this.variables), // Capture the current variable state for closures
           type: "user-defined-function"
         };
         this.variables.set(node.name, funcData);
         return null;
 
       case "String":
+        return node.value;
+
+      case "Double":
+        return parseFloat(node.value);
+
+      case "Integer":
+        return parseInt(node.value, 10);
+
+      case "BooleanLiteral":
         return node.value;
 
 
