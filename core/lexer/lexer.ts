@@ -45,12 +45,13 @@ export class Lexer {
       case "/":
         this.readChar();
         return { type: TokenType.Operator, value: "/" };
-      case ";":
-        this.readChar();
-        return { type: TokenType.Operator, value: ";" };
+      
       case "#":
         const comment = this.readComment();
         return { type: TokenType.Comment, value: comment };
+      case ";":
+        this.readChar();
+        return { type: TokenType.Operator, value: ";" };
         
       case '"':
         this.readChar(); // Consume the opening quote

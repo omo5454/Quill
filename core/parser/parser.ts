@@ -69,6 +69,8 @@ export class Parser {
       return this.parseExpressionStatement();
     } else if (token.type === TokenType.Loop) {
       return this.parseLoopExpression();
+    } else if (token.type === TokenType.Comment) {
+      return this.parseComment();
     }
     
     throw new Error(`Unexpected token at statement level: ${token.value} (${token.type})`);
