@@ -162,6 +162,7 @@ export class Lexer {
           const keywords = [
             "let",
             "printf",
+            "say",
             "if",
             "const",
             "func",

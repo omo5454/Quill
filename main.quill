@@ -1,2 +1,1 @@
-let name = "Omri";
-printf("Hello " + name);
+say "Hello, world!";
