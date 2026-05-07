@@ -1,11 +1,2 @@
-let time = timeNow();
 let name = "Omri";
-
-printf(time);
-
-func greet(arg){
-
-    printf("Hello ");
-}
-
-greet(name);
+printf("Hello " + name);

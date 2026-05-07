@@ -139,7 +139,7 @@ export class Interpreter {
 
       case "PrintStatement":
         const output = this.interpret(node.expression);
-        console.log(output);
+        console.log(`${output}`);
         return output;
 
       case "ArrayLiteral":

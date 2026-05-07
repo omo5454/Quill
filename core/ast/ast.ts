@@ -64,8 +64,8 @@ export interface Identifier {
 }
 
 export interface PrintStatement {
-    type: "PrintStatement";
-    expression: Expression; // Changed from 'identifier' to 'expression'
+  type: "PrintStatement";
+  expression: Expression; // Changed from 'identifier' to 'expression'
 }
 
 export interface ArrayLiteral {
@@ -77,6 +77,11 @@ export interface CallExpression {
   type: "CallExpression";
   callee: string;
   arguments: Expression[];
+}
+
+export interface Dot {
+  type: "Dot";
+  name: string
 }
 
 export interface ComparisonExpression {
@@ -105,35 +110,35 @@ export interface IndexExpression {
   index: Expression; // The index or key being accessed
 }
 
-export type Statement = 
-VariableDeclaration 
-| PrintStatement 
-| Comment 
-| Function 
-| Expression 
-| String 
-| BooleanLiteral
-| CallExpression
-| ComparisonExpression
-| ConditionalExpression
-| LoopExpression
-| ArrayLiteral
-| IndexExpression
-| Double
-| Integer;
-
-
-export type Expression = 
-BinaryExpression 
-| Literal 
-| Identifier 
-| CallExpression 
-| String 
-| BooleanLiteral
-| ComparisonExpression
-| ConditionalExpression
-| LoopExpression
-| ArrayLiteral
-| IndexExpression
-| Double
-| Integer;
+export type Statement =
+  | VariableDeclaration
+  | PrintStatement
+  | Comment
+  | Function
+  | Expression
+  | String
+  | BooleanLiteral
+  | CallExpression
+  | ComparisonExpression
+  | ConditionalExpression
+  | LoopExpression
+  | ArrayLiteral
+  | IndexExpression
+  | Double
+  | Integer
+  | Dot;
+export type Expression =
+  | BinaryExpression
+  | Literal
+  | Identifier
+  | CallExpression
+  | String
+  | BooleanLiteral
+  | ComparisonExpression
+  | ConditionalExpression
+  | LoopExpression
+  | ArrayLiteral
+  | IndexExpression
+  | Double
+  | Integer
+  | Dot;

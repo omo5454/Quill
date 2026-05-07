@@ -10,6 +10,7 @@ import {
   ConditionalExpression,
   ArrayLiteral,
   Double,
+  Dot,
 } from "../ast/ast";
 import { TokenType, Token } from "../types/types";
 
@@ -83,7 +84,7 @@ export class Parser {
     if (token.type === TokenType.Keyword) {
       if (token.value === "let" || token.value === "const")
         return this.parseVariableDeclaration();
-      if (token.value === "printf") return this.parsePrintStatement();
+      if (token.value === "printf" || "say") return this.parsePrintStatement();
       if (token.value === "func") return this.parseFunctionDeclaration();
       if (token.value === "true" || token.value === "false")
         return this.parseExpressionStatement();
@@ -142,6 +143,7 @@ export class Parser {
     }
     return { type: "String", value: token.value };
   }
+
 
   private parseVariableDeclaration(): VariableDeclaration {
     this.advance(); // consume "let"

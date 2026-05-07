@@ -4,6 +4,14 @@ export class Lexer {
   private position = 0;
   private char: string | null = "";
 
+  private peekChar() {
+    if (this.position >= this.input.length) {
+      return ""; // Return a null or EOF marker if at the end
+    } else {
+      return this.input[this.position];
+    }
+  }
+
   constructor(private input: string) {
     this.readChar(); // Initialize the first character
   }
@@ -72,11 +80,11 @@ export class Lexer {
 
       case ".": // Handle double literals
         this.readChar();
-        if (this.isDigit(this.char)) {
+        if (this.isDigit(this.peekChar())) {
           const doubleValue = this.readNumber();
           return { type: TokenType.Double, value: doubleValue };
         }
-        return { type: TokenType.Illegal, value: "." };
+        return { type: TokenType.Dot, value: "." };
       case ">":
         this.readChar();
         if ((this.char as string) === "=") {
@@ -233,7 +241,7 @@ export class Lexer {
 
   private readNumber(): string {
     let literal = "";
-    while (this.isDigit(this.char)) {
+    while (this.isDigit(this.char) || this.char === ".") {
       literal += this.char;
       this.readChar();
     }
