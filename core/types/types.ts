@@ -15,7 +15,8 @@ export enum TokenType {
   Conditional = "Conditional",
   Loop = "Loop",
   Integer = "Integer",
-  Dot = "Dot"
+  Dot = "Dot",
+  Incrementation = "Incrementation",
 }
 
 export interface Token {

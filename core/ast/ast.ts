@@ -53,6 +53,12 @@ export interface Function {
   body: Statement[];
 }
 
+export interface incrementationExpression {
+  type: "incrementationExpression";
+  operator: string;
+  argument: any;
+}
+
 export interface BooleanLiteral {
   type: "BooleanLiteral";
   value: boolean;
@@ -126,7 +132,8 @@ export type Statement =
   | IndexExpression
   | Double
   | Integer
-  | Dot;
+  | Dot
+  | incrementationExpression;
 export type Expression =
   | BinaryExpression
   | Literal
@@ -141,4 +148,5 @@ export type Expression =
   | IndexExpression
   | Double
   | Integer
-  | Dot;
+  | Dot
+  | incrementationExpression;

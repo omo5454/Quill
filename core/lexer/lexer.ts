@@ -43,9 +43,17 @@ export class Lexer {
     switch (this.char) {
       case "+":
         this.readChar();
+        if ((this.char as string) === "+") {
+          this.readChar();
+          return { type: TokenType.Incrementation, value: "++" }
+        }
         return { type: TokenType.Operator, value: "+" };
       case "-":
         this.readChar();
+        if ((this.char as string) === "-") {
+          this.readChar();
+          return { type: TokenType.Incrementation, value: "--" }
+        }
         return { type: TokenType.Operator, value: "-" };
       case "*":
         this.readChar();
@@ -78,13 +86,13 @@ export class Lexer {
         this.readChar(); // Consume the closing quote
         return { type: TokenType.String, value: strValue };
 
-      case ".": // Handle double literals
-        this.readChar();
-        if (this.isDigit(this.peekChar())) {
-          const doubleValue = this.readNumber();
-          return { type: TokenType.Double, value: doubleValue };
-        }
-        return { type: TokenType.Dot, value: "." };
+        case ".":
+            this.readChar(); // now this.char is the char after "."
+            if (this.isDigit(this.char)) {  // check current char, not peekChar
+                const doubleValue = "." + this.readNumber();
+                return { type: TokenType.Double, value: doubleValue };
+            }
+            return { type: TokenType.Dot, value: "." };
       case ">":
         this.readChar();
         if ((this.char as string) === "=") {
@@ -148,7 +156,7 @@ export class Lexer {
         this.readChar();
         return { type: TokenType.Operator, value: ")" };
 
-      case "{": // Add these if missing!
+      case "{": 
         this.readChar();
         return { type: TokenType.Operator, value: "{" };
       case "}":
@@ -166,8 +174,8 @@ export class Lexer {
             "if",
             "const",
             "func",
-            "true",
-            "false",
+            "True",
+            "False",
             "else",
             "while",
             ">",
@@ -190,13 +198,11 @@ export class Lexer {
 
         // Handle Numbers
         if (this.isDigit(this.char)) {
-          const num = this.readNumber();
-          return { type: TokenType.Number, value: num };
-        }
-
-        if (this.isDouble(this.char)) {
-          const double = this.readNumber();
-          return { type: TokenType.Double, value: double };
+            const num = this.readNumber();
+            if (num.includes(".")) {
+                return { type: TokenType.Double, value: num };
+            }
+            return { type: TokenType.Number, value: num };
         }
 
         // If we don't recognize it, it's an illegal character
@@ -214,21 +220,18 @@ export class Lexer {
     return !!char && /[0-9]/.test(char);
   }
 
-  private isDouble(char: string | null): boolean {
-    return !!char && /[0-9.]/.test(char);
-  }
 
   private isInteger(char: string | null): boolean {
     return !!char && /[0-9]/.test(char);
   }
 
   private readIdentifier(): string {
-    let literal = "";
-    while (this.isLetter(this.char)) {
-      literal += this.char;
-      this.readChar();
-    }
-    return literal;
+      let literal = "";
+      while (this.isLetter(this.char) || (literal.length > 0 && this.isDigit(this.char))) {
+          literal += this.char;
+          this.readChar();
+      }
+      return literal;
   }
 
   private readComment(): string {

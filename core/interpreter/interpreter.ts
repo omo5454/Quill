@@ -124,13 +124,10 @@ export class Interpreter {
         return node.value;
 
       case "Double":
-        return parseFloat(node.value);
+        return node.value;
 
       case "Integer":
         return parseInt(node.value, 10);
-
-      case "BooleanLiteral":
-        return node.value;
 
       case "VariableDeclaration":
         const val = this.interpret(node.value);
@@ -172,6 +169,14 @@ export class Interpreter {
           default:
             throw new Error(`Unknown comparison operator: ${node.operator}`);
         }
+
+        case "incrementationExpression":
+            const currentVal = this.variables.get(node.identifier);
+            if (currentVal === undefined)
+                throw new Error(`Undefined variable: ${node.identifier}`);
+            const newVal = node.operator === "++" ? currentVal + 1 : currentVal - 1;
+            this.variables.set(node.identifier, newVal); // actually update the variable
+            return newVal;
 
       case "BinaryExpression":
         const left = this.interpret(node.left);

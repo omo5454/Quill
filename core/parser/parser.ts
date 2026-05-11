@@ -8,15 +8,16 @@ import {
   CallExpression,
   String,
   ConditionalExpression,
-  ArrayLiteral,
   Double,
-  Dot,
+  incrementationExpression,
 } from "../ast/ast";
 import { TokenType, Token } from "../types/types";
 
 export class Parser {
   private tokens: Token[];
   private current = 0;
+  private position = 0;
+  private char: string | null = "";
 
   constructor(tokens: Token[]) {
     this.tokens = tokens;
@@ -26,6 +27,14 @@ export class Parser {
   private peek(): Token {
     return this.tokens[this.current] || { type: TokenType.EOF, value: "" };
   }
+
+  private consume(expectedValue: string, errorMessage: string): Token {
+      if (this.peek().value !== expectedValue) {
+          throw new Error(errorMessage);
+      }
+      return this.advance();
+  }
+
 
   // Helper to consume current token and move to next
   private advance(): Token {
@@ -84,9 +93,9 @@ export class Parser {
     if (token.type === TokenType.Keyword) {
       if (token.value === "let" || token.value === "const")
         return this.parseVariableDeclaration();
-      if (token.value === "printf" || "say") return this.parsePrintStatement();
+      if (token.value === "printf" || token.value === "say") return this.parsePrintStatement();
       if (token.value === "func") return this.parseFunctionDeclaration();
-      if (token.value === "true" || token.value === "false")
+      if (token.value === "True" || token.value === "False")
         return this.parseExpressionStatement();
       if (
         token.value === ">" ||
@@ -115,6 +124,8 @@ export class Parser {
       return this.parseComment();
     } else if (token.type === TokenType.Double) {
       return this.parseExpressionStatement();
+    } else if (token.type === TokenType.Conditional) {
+      return this.parseConditionalExpression();
     }
 
     throw new Error(
@@ -128,13 +139,6 @@ export class Parser {
     return expr; // In a simple AST, you can just return the expression node
   }
 
-  private parseDouble(): Double {
-    const token = this.advance();
-    if (token.type !== TokenType.Double) {
-      throw new Error(`Expected double literal, but got: ${token.value}`);
-    }
-    return { type: "Double", value: parseFloat(token.value) };
-  }
 
   private parseString(): String {
     const token = this.advance();
@@ -235,6 +239,8 @@ export class Parser {
       } else if (this.peek().value === "if") {
         // This handles "else if" by recursion
         alternate = [this.parseConditionalExpression() as any];
+      } else if (this.peek().value === "elif") {
+        alternate = [this.parseConditionalExpression() as any];
       }
     }
 
@@ -247,7 +253,7 @@ export class Parser {
   }
 
   private parsePrintStatement(): PrintStatement {
-    this.advance(); // consume "printf"
+    this.advance(); // consume "printf" or "say"
     const val = this.parseExpression();
 
     if (!this.isAtEnd() && this.peek().value === ";") {
@@ -256,6 +262,7 @@ export class Parser {
 
     return { type: "PrintStatement", expression: val };
   }
+
 
   private parseComment(): Comment {
     const token = this.advance(); // consume the comment token
@@ -310,29 +317,44 @@ export class Parser {
   }
 
   private parseExpression(): Expression {
-    let left = this.parsePrimary();
-
-    // ADD THIS: Handle Indexing (e.g., list)
-    while (this.peek().value === "[") {
-      this.advance(); // consume "["
-      const index = this.parseExpression();
-      if (this.peek().value !== "]") throw new Error("Expected ']'");
-      this.advance(); // consume "]"
-      left = { type: "IndexExpression", object: left, index };
-    }
-
-    // Your existing binary operator loop follows...
-    while (!this.isAtEnd() && this.isBinaryOperator(this.peek())) {
-      const operator = this.advance().value;
-      const right = this.parsePrimary();
-      left = { type: "BinaryExpression", left, operator, right };
-    }
-
-    return left;
+      let left = this.parsePrimary();
+  
+      // Postfix operators
+      while (!this.isAtEnd()) {
+          const next = this.peek();
+          if (next.value === "[") {
+              this.advance();
+              const index = this.parseExpression();
+              this.consume("]", "Expected ']'");
+              left = { type: "IndexExpression", object: left, index } as any;
+          } else if (next.type === TokenType.Incrementation) {
+              const operator = this.advance().value;
+              left = {
+                  type: "incrementationExpression",
+                  identifier: (left as any).name || (left as any).value,
+                  operator,
+                  isPrefix: false
+              } as any;
+          } else {
+              break;
+          }
+      }
+  
+      // Binary operators — loop, not recursion
+      while (!this.isAtEnd() && this.isBinaryOperator(this.peek())) {
+          const operator = this.advance().value;
+          const right = this.parsePrimary(); // parsePrimary, NOT parseExpression
+          left = { type: "BinaryExpression", left, operator, right } as any;
+      }
+  
+      return left;
   }
+
+
 
   // Helper to identify operators that join two expressions
   private isBinaryOperator(token: Token): boolean {
+    if (token.value === "{" || token.value === "}" || token.value === ";") return false; // safety guard
     return (
       token.type === TokenType.Operator &&
       [
@@ -355,6 +377,7 @@ export class Parser {
   // parsePrimary handles the "smallest" units: numbers and variables
   private parsePrimary(): Expression {
     const token = this.peek(); // peek first, don't consume yet
+    let currentToken: TokenType;
 
     // Handle parenthesized expressions: (expr)
     if (token.value === "(") {
@@ -366,24 +389,27 @@ export class Parser {
       this.advance(); // consume ")"
       return expr;
     }
-
     // Now consume for all other cases
     const consumed = this.advance();
 
     if (consumed.type === TokenType.Number)
       return { type: "Literal", value: Number(consumed.value) };
 
+
+
+    
     if (consumed.type === TokenType.Double)
       return { type: "Double", value: parseFloat(consumed.value) };
 
     if (consumed.type === TokenType.String)
       return { type: "String", value: consumed.value };
 
+
     if (
       consumed.type === TokenType.Keyword &&
-      (consumed.value === "true" || consumed.value === "false")
+      (consumed.value === "True" || consumed.value === "False")
     )
-      return { type: "Literal", value: consumed.value === "true" ? 1 : 0 };
+      return { type: "Literal", value: consumed.value === "True" ? 1 : 0 };
 
     if (consumed.type === TokenType.Identifier) {
       if (this.peek().value === "(") {
@@ -413,6 +439,7 @@ export class Parser {
       }
       return { type: "Identifier", name: consumed.value };
     }
+    
 
     throw new Error(`Expected expression, but got: ${consumed.value}`);
   }
