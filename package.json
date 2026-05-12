@@ -1,6 +1,6 @@
 {
   "name": "quill",
-  "version": "0.0.3",
+  "version": "0.0.3.2",
   "description": "An interperter to Quill",
   "homepage": "https://github.com/omrimorgan5-hub/Quill#readme",
   "bugs": {
@@ -18,8 +18,10 @@
     "test": "jest",
     "build": "tsc",
     "bundle": "esbuild dest/quill.js --bundle --platform=node --format=esm --outfile=dest/quill.bundled.js",
-    "minify": "terser dest/quill.bundled.js --compress --mangle --output dest/quill.min.js && bun build --compile ./dest/quill.min.js --outfile quill.exe",
-    "release": "npm run build && npm run bundle && npm run minify"
+    "minify:win":   "terser dest/quill.bundled.js --compress --mangle --output dest/quill.min.js && bun build dest/quill.min.js --compile --target bun-windows-x64 --outfile quill.exe",
+    "minify:linux": "terser dest/quill.bundled.js --compress --mangle --output dest/quill.min.js && bun build dest/quill.min.js --compile --target bun-linux-x64 --outfile quill-linux",
+    "minify:mac":   "terser dest/quill.bundled.js --compress --mangle --output dest/quill.min.js && bun build dest/quill.min.js --compile --target bun-darwin-arm64 --outfile quill-mac",
+    "release":  "npm run build && npm run bundle && npm run minify:win && npm run minify:linux && npm run minify:mac"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

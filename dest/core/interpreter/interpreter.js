@@ -1,3 +1,8 @@
+class ReturnValue {
+    constructor(value) {
+        this.value = value;
+    }
+}
 export class Interpreter {
     constructor() {
         // This stores our variables
@@ -58,8 +63,16 @@ export class Interpreter {
                         });
                         // 3. Execute the body
                         let lastResult = null;
-                        for (const stmt of functionData.body) {
-                            lastResult = this.interpret(stmt);
+                        try {
+                            for (const stmt of functionData.body) {
+                                lastResult = this.interpret(stmt);
+                            }
+                        }
+                        catch (e) {
+                            if (e instanceof ReturnValue) {
+                                return e.value; // clean return
+                            }
+                            throw e; // real error, rethrow
                         }
                         return lastResult;
                     }
@@ -111,6 +124,9 @@ export class Interpreter {
                 const output = this.interpret(node.expression);
                 console.log(`${output}`);
                 return output;
+            case "ReturnStatement":
+                const returnVal = node.value ? this.interpret(node.value) : null;
+                throw new ReturnValue(returnVal);
             case "ArrayLiteral":
                 return node.elements.map((el) => this.interpret(el));
             case "IndexExpression":

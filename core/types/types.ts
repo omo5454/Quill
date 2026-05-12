@@ -17,6 +17,7 @@ export const TokenType = {
   Integer: "Integer",
   Dot: "Dot",
   Incrementation: "Incrementation",
+  Return: "Return",
 } as const;
 
 export type TokenType = typeof TokenType[keyof typeof TokenType];

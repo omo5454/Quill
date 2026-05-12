@@ -67,6 +67,8 @@ export class Parser {
                 return this.parseConditionalExpression();
             if (token.value === "while")
                 return this.parseLoopExpression();
+            if (token.value === "return")
+                return this.parseReturnStatement();
         }
         if (token.type === TokenType.Identifier || token.value === "(") {
             return this.parseExpressionStatement();
@@ -192,6 +194,20 @@ export class Parser {
             this.advance();
         }
         return { type: "PrintStatement", expression: val };
+    }
+    parseReturnStatement() {
+        this.advance(); // consume "return"
+        // "return;" with no value
+        if (this.peek().value === "}" || this.peek().value === ";") {
+            if (this.peek().value === ";")
+                this.advance();
+            return { type: "ReturnStatement", value: null };
+        }
+        const value = this.parseExpression();
+        if (!this.isAtEnd() && this.peek().value === ";") {
+            this.advance();
+        }
+        return { type: "ReturnStatement", value };
     }
     parseComment() {
         const token = this.advance(); // consume the comment token

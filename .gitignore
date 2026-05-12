@@ -1,11 +1,27 @@
 node_modules
 
-*.exe
 *.iss
 
 info.txt
 dev.quill
 minify.ps1
+Dev-Internal.md
+Check-List.md
 
 images
 versions
+releases
+
+# Build output
+dest/
+releases/
+
+# Executables
+*.exe
+quill-linux
+quill-macos-intel
+quill-macos-arm
+
+# Misc
+.DS_Store
+Thumbs.db

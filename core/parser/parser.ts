@@ -10,6 +10,7 @@ import {
   ConditionalExpression,
   Double,
   incrementationExpression,
+  ReturnStatement,
 } from "../ast/ast";
 import { TokenType, Token } from "../types/types";
 
@@ -93,6 +94,7 @@ export class Parser {
       if (token.value === "else") return this.parseConditionalExpression();
       if (token.value === "elif") return this.parseConditionalExpression();
       if (token.value === "while") return this.parseLoopExpression();
+      if (token.value === "return") return this.parseReturnStatement();
     }
 
     if (token.type === TokenType.Identifier || token.value === "(") {
@@ -242,6 +244,24 @@ export class Parser {
     }
 
     return { type: "PrintStatement", expression: val };
+  }
+
+  private parseReturnStatement(): Statement {
+      this.advance(); // consume "return"
+  
+      // "return;" with no value
+      if (this.peek().value === "}" || this.peek().value === ";") {
+          if (this.peek().value === ";") this.advance();
+          return { type: "ReturnStatement", value: null };
+      }
+  
+      const value = this.parseExpression();
+  
+      if (!this.isAtEnd() && this.peek().value === ";") {
+          this.advance();
+      }
+  
+      return { type: "ReturnStatement", value };
   }
 
 

@@ -7,14 +7,14 @@ import { Interpreter } from './core/interpreter/interpreter';
 // 1. Get the file path from command line arguments (e.g., node quill.js test.quill)
 const arg = process.argv[2];
 
-var version = "0.0.3.1\nMajor: 0\nMinor: 0\nBug/Fix: 3\nStatus: Beta";
+var version = "0.0.3.3\nMajor: 0\nMinor: 0\nBug/Fix: 3\nStatus: Pre-Release";
 
 if (!arg) {
     console.error("Usage: quill <filename.quill>");
     process.exit(1);
 }
 
-if (arg === "-v" || "--version") {
+if (arg === "-v" || arg === "--version") {
   console.log(version);
   process.exit(0);
 }

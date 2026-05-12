@@ -13,6 +13,11 @@ export interface VariableDeclaration {
   value: Expression;
 }
 
+export interface ReturnStatement {
+  type: "ReturnStatement";
+  value: string | Expression | null;
+}
+
 // Math or values like "5 + 10"
 export interface BinaryExpression {
   type: "BinaryExpression";
@@ -133,7 +138,8 @@ export type Statement =
   | Double
   | Integer
   | Dot
-  | incrementationExpression;
+  | incrementationExpression
+  | ReturnStatement;
 export type Expression =
   | BinaryExpression
   | Literal
@@ -149,4 +155,5 @@ export type Expression =
   | Double
   | Integer
   | Dot
-  | incrementationExpression;
+  | incrementationExpression
+  | ReturnStatement;

@@ -164,6 +164,7 @@ export class Lexer {
                         "False",
                         "else",
                         "while",
+                        "return",
                         ">",
                         "<",
                         ">=",

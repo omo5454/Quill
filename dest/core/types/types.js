@@ -17,4 +17,5 @@ export const TokenType = {
     Integer: "Integer",
     Dot: "Dot",
     Incrementation: "Incrementation",
+    Return: "Return",
 };

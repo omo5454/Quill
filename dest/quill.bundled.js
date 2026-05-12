@@ -21,7 +21,8 @@ var TokenType = {
   Loop: "Loop",
   Integer: "Integer",
   Dot: "Dot",
-  Incrementation: "Incrementation"
+  Incrementation: "Incrementation",
+  Return: "Return"
 };
 
 // dest/core/lexer/lexer.js
@@ -182,6 +183,7 @@ var Lexer = class {
             "False",
             "else",
             "while",
+            "return",
             ">",
             "<",
             ">=",
@@ -304,6 +306,8 @@ var Parser = class {
         return this.parseConditionalExpression();
       if (token.value === "while")
         return this.parseLoopExpression();
+      if (token.value === "return")
+        return this.parseReturnStatement();
     }
     if (token.type === TokenType.Identifier || token.value === "(") {
       return this.parseExpressionStatement();
@@ -413,6 +417,19 @@ var Parser = class {
       this.advance();
     }
     return { type: "PrintStatement", expression: val };
+  }
+  parseReturnStatement() {
+    this.advance();
+    if (this.peek().value === "}" || this.peek().value === ";") {
+      if (this.peek().value === ";")
+        this.advance();
+      return { type: "ReturnStatement", value: null };
+    }
+    const value = this.parseExpression();
+    if (!this.isAtEnd() && this.peek().value === ";") {
+      this.advance();
+    }
+    return { type: "ReturnStatement", value };
   }
   parseComment() {
     const token = this.advance();
@@ -560,6 +577,11 @@ var Parser = class {
 };
 
 // dest/core/interpreter/interpreter.js
+var ReturnValue = class {
+  constructor(value) {
+    this.value = value;
+  }
+};
 var Interpreter = class {
   constructor() {
     this.variables = /* @__PURE__ */ new Map();
@@ -615,8 +637,15 @@ var Interpreter = class {
               this.variables.set(paramName, args[index]);
             });
             let lastResult = null;
-            for (const stmt of functionData.body) {
-              lastResult = this.interpret(stmt);
+            try {
+              for (const stmt of functionData.body) {
+                lastResult = this.interpret(stmt);
+              }
+            } catch (e) {
+              if (e instanceof ReturnValue) {
+                return e.value;
+              }
+              throw e;
             }
             return lastResult;
           } finally {
@@ -663,6 +692,9 @@ var Interpreter = class {
         const output = this.interpret(node.expression);
         console.log(`${output}`);
         return output;
+      case "ReturnStatement":
+        const returnVal = node.value ? this.interpret(node.value) : null;
+        throw new ReturnValue(returnVal);
       case "ArrayLiteral":
         return node.elements.map((el) => this.interpret(el));
       case "IndexExpression":
@@ -757,12 +789,12 @@ var Interpreter = class {
 
 // dest/quill.js
 var arg = process.argv[2];
-var version = "0.0.3.1\nMajor: 0\nMinor: 0\nBug/Fix: 3\nStatus: Beta";
+var version = "0.0.3.3\nMajor: 0\nMinor: 0\nBug/Fix: 3\nStatus: Pre-Release";
 if (!arg) {
   console.error("Usage: quill <filename.quill>");
   process.exit(1);
 }
-if (arg === "-v" || "--version") {
+if (arg === "-v" || arg === "--version") {
   console.log(version);
   process.exit(0);
 }

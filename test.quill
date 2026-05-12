@@ -236,5 +236,24 @@ let result = 100;
 # another comment
 printf("result = " + result);
 
+# ─── Return statements early and end ────────────────────────────────────────
+func add(a, b) {
+    return a + b;
+}
+
+let result = add(3, 4);
+printf(result);
+
+
+# early 
+func isAdult(age) {
+    if age < 18 {
+        return "no";
+    }
+    return "yes";
+}
+
+printf(isAdult(20));
+
 # ─── End ─────────────────────────────────────────────────────────────────────
 say "All tests complete.";
