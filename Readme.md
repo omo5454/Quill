@@ -217,4 +217,4 @@ Quill uses a 4-part versioning system: `MAJOR.MINOR.PATCH.STATUS`
 | `2` | Alomost |
 | `3` | Pre-release |
 
-Current version: **0.0.3.1**
+Current version: **0.0.3.3**
