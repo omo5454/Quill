@@ -1,7 +1,4 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Interpreter = void 0;
-class Interpreter {
+export class Interpreter {
     constructor() {
         // This stores our variables
         this.variables = new Map();
@@ -205,4 +202,3 @@ class Interpreter {
         return result;
     }
 }
-exports.Interpreter = Interpreter;

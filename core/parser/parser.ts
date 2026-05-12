@@ -16,8 +16,7 @@ import { TokenType, Token } from "../types/types";
 export class Parser {
   private tokens: Token[];
   private current = 0;
-  private position = 0;
-  private char: string | null = "";
+
 
   constructor(tokens: Token[]) {
     this.tokens = tokens;
@@ -46,24 +45,6 @@ export class Parser {
     return this.peek().type === TokenType.EOF;
   }
 
-  private parseCallExpression(callee: string): CallExpression {
-    this.advance(); // consume '('
-    const args = [];
-
-    // CHECK FOR EMPTY CALL: myFunc()
-    if (this.peek().value !== ")") {
-      do {
-        args.push(this.parseExpression());
-      } while (this.peek().value === "," && this.advance()); // consume comma and continue
-    }
-
-    if (this.peek().value !== ")") {
-      throw new Error("Expected ')' after arguments");
-    }
-    this.advance(); // consume ')'
-
-    return { type: "CallExpression", callee, arguments: args };
-  }
 
   public parse(): Program {
     const program: Program = { type: "Program", body: [] };

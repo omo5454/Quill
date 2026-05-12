@@ -1,17 +1,12 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Parser = void 0;
-const types_1 = require("../types/types");
-class Parser {
+import { TokenType } from "../types/types";
+export class Parser {
     constructor(tokens) {
         this.current = 0;
-        this.position = 0;
-        this.char = "";
         this.tokens = tokens;
     }
     // Helper to look at current token without consuming it
     peek() {
-        return this.tokens[this.current] || { type: types_1.TokenType.EOF, value: "" };
+        return this.tokens[this.current] || { type: TokenType.EOF, value: "" };
     }
     consume(expectedValue, errorMessage) {
         if (this.peek().value !== expectedValue) {
@@ -25,22 +20,7 @@ class Parser {
     }
     // Helper to check if we've reached the end
     isAtEnd() {
-        return this.peek().type === types_1.TokenType.EOF;
-    }
-    parseCallExpression(callee) {
-        this.advance(); // consume '('
-        const args = [];
-        // CHECK FOR EMPTY CALL: myFunc()
-        if (this.peek().value !== ")") {
-            do {
-                args.push(this.parseExpression());
-            } while (this.peek().value === "," && this.advance()); // consume comma and continue
-        }
-        if (this.peek().value !== ")") {
-            throw new Error("Expected ')' after arguments");
-        }
-        this.advance(); // consume ')'
-        return { type: "CallExpression", callee, arguments: args };
+        return this.peek().type === TokenType.EOF;
     }
     parse() {
         const program = { type: "Program", body: [] };
@@ -51,7 +31,7 @@ class Parser {
                 continue;
             }
             // Ignore comments at the top level; they are not part of the statement AST.
-            if (this.peek().type === types_1.TokenType.Comment) {
+            if (this.peek().type === TokenType.Comment) {
                 this.advance();
                 continue;
             }
@@ -61,7 +41,7 @@ class Parser {
     }
     parseStatement() {
         const token = this.peek();
-        if (token.type === types_1.TokenType.Keyword) {
+        if (token.type === TokenType.Keyword) {
             if (token.value === "let" || token.value === "const")
                 return this.parseVariableDeclaration();
             if (token.value === "printf" || token.value === "say")
@@ -88,22 +68,22 @@ class Parser {
             if (token.value === "while")
                 return this.parseLoopExpression();
         }
-        if (token.type === types_1.TokenType.Identifier || token.value === "(") {
+        if (token.type === TokenType.Identifier || token.value === "(") {
             return this.parseExpressionStatement();
         }
-        else if (token.type === types_1.TokenType.String) {
+        else if (token.type === TokenType.String) {
             return this.parseExpressionStatement();
         }
-        else if (token.type === types_1.TokenType.Loop) {
+        else if (token.type === TokenType.Loop) {
             return this.parseLoopExpression();
         }
-        else if (token.type === types_1.TokenType.Comment) {
+        else if (token.type === TokenType.Comment) {
             return this.parseComment();
         }
-        else if (token.type === types_1.TokenType.Double) {
+        else if (token.type === TokenType.Double) {
             return this.parseExpressionStatement();
         }
-        else if (token.type === types_1.TokenType.Conditional) {
+        else if (token.type === TokenType.Conditional) {
             return this.parseConditionalExpression();
         }
         throw new Error(`Unexpected token at statement level: ${token.value} (${token.type})`);
@@ -116,7 +96,7 @@ class Parser {
     }
     parseString() {
         const token = this.advance();
-        if (token.type !== types_1.TokenType.String) {
+        if (token.type !== TokenType.String) {
             throw new Error(`Expected string literal, but got: ${token.value}`);
         }
         return { type: "String", value: token.value };
@@ -124,7 +104,7 @@ class Parser {
     parseVariableDeclaration() {
         this.advance(); // consume "let"
         const idToken = this.advance(); // get identifier (x)
-        if (idToken.type !== types_1.TokenType.Identifier) {
+        if (idToken.type !== TokenType.Identifier) {
             throw new Error("Expected variable name after 'let'");
         }
         if (this.peek().value !== "=") {
@@ -220,7 +200,7 @@ class Parser {
     parseFunctionDeclaration() {
         this.advance(); // consume "func"
         const nameToken = this.advance(); // get function name
-        if (nameToken.type !== types_1.TokenType.Identifier) {
+        if (nameToken.type !== TokenType.Identifier) {
             throw new Error("Expected function name after 'func'");
         }
         if (this.peek().value !== "(") {
@@ -230,7 +210,7 @@ class Parser {
         const parameters = [];
         while (!this.isAtEnd() && this.peek().value !== ")") {
             const paramToken = this.advance();
-            if (paramToken.type !== types_1.TokenType.Identifier) {
+            if (paramToken.type !== TokenType.Identifier) {
                 throw new Error("Expected parameter name in function declaration");
             }
             parameters.push(paramToken.value);
@@ -271,7 +251,7 @@ class Parser {
                 this.consume("]", "Expected ']'");
                 left = { type: "IndexExpression", object: left, index };
             }
-            else if (next.type === types_1.TokenType.Incrementation) {
+            else if (next.type === TokenType.Incrementation) {
                 const operator = this.advance().value;
                 left = {
                     type: "incrementationExpression",
@@ -296,7 +276,7 @@ class Parser {
     isBinaryOperator(token) {
         if (token.value === "{" || token.value === "}" || token.value === ";")
             return false; // safety guard
-        return (token.type === types_1.TokenType.Operator &&
+        return (token.type === TokenType.Operator &&
             [
                 "+",
                 "-",
@@ -328,16 +308,16 @@ class Parser {
         }
         // Now consume for all other cases
         const consumed = this.advance();
-        if (consumed.type === types_1.TokenType.Number)
+        if (consumed.type === TokenType.Number)
             return { type: "Literal", value: Number(consumed.value) };
-        if (consumed.type === types_1.TokenType.Double)
+        if (consumed.type === TokenType.Double)
             return { type: "Double", value: parseFloat(consumed.value) };
-        if (consumed.type === types_1.TokenType.String)
+        if (consumed.type === TokenType.String)
             return { type: "String", value: consumed.value };
-        if (consumed.type === types_1.TokenType.Keyword &&
+        if (consumed.type === TokenType.Keyword &&
             (consumed.value === "True" || consumed.value === "False"))
             return { type: "Literal", value: consumed.value === "True" ? 1 : 0 };
-        if (consumed.type === types_1.TokenType.Identifier) {
+        if (consumed.type === TokenType.Identifier) {
             if (this.peek().value === "(") {
                 this.advance(); // consume "("
                 const args = [];
@@ -367,4 +347,3 @@ class Parser {
         throw new Error(`Expected expression, but got: ${consumed.value}`);
     }
 }
-exports.Parser = Parser;

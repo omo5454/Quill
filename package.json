@@ -1,6 +1,6 @@
 {
   "name": "quill",
-  "version": "1.0.0",
+  "version": "0.0.3",
   "description": "An interperter to Quill",
   "homepage": "https://github.com/omrimorgan5-hub/Quill#readme",
   "bugs": {
@@ -15,16 +15,23 @@
   "type": "module",
   "main": "./dist/quill.js",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "build": "tsc",
+    "bundle": "esbuild dest/quill.js --bundle --platform=node --format=esm --outfile=dest/quill.bundled.js",
+    "minify": "terser dest/quill.bundled.js --compress --mangle --output dest/quill.min.js && bun build --compile ./dest/quill.min.js --outfile quill.exe",
+    "release": "npm run build && npm run bundle && npm run minify"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^25.6.0",
     "chai": "^6.2.2",
+    "esbuild": "^0.28.0",
+    "google-closure-compiler": "^20260506.0.0",
     "i": "^0.3.7",
     "jest": "^30.4.2",
     "npm": "^11.14.1",
     "or": "^0.2.0",
+    "terser": "^5.47.1",
     "ts-jest": "^29.4.9"
   }
 }

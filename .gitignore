@@ -1,5 +1,11 @@
 node_modules
 
 *.exe
+*.iss
 
-.info.txt
+info.txt
+dev.quill
+minify.ps1
+
+images
+versions

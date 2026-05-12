@@ -1,16 +1,15 @@
 {
   "compilerOptions": {
-    "target": "ES2016",
-    "module": "commonjs",
+    "target": "ES2015",
+    "module": "ESNext",
     "lib": ["ES2016", "DOM"],
-    "rootDir": "./", 
-    "outDir": "dist",
+    "rootDir": "./",
+    "outDir": "./dest",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "types": ["node", "jest"]
-
   },
-  "include": ["**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["core/**/*", "quill.ts"],
+  "exclude": ["node_modules", "dest", "**/*.test.ts"]
 }
