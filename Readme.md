@@ -1,220 +1,307 @@
 # Quill
-Quill is a simple, readable scripting language with a clean syntax designed for clarity. It supports variables, functions, conditionals, loops, incrementation, and a standard library.
+
+Quill is a statically typed, bytecode-compiled scripting language designed for clarity, speed, and shareable function modules. It compiles to a binary `.qbc` bytecode format and runs on a purpose-built VM written in Go.
 
 ---
 
-## Table of Contents
-- [Installation](#installation)
-- [Variables](#variables)
-- [Printing](#printing)
-- [Conditionals](#conditionals)
-- [Loops](#loops)
-- [Functions](#functions)
-- [Incrementation](#incrementation)
-- [Standard Library](#standard-library)
-- [Comments](#comments)
-- [Versioning](#versioning)
+## Why Quill?
+
+- **Statically typed** — type errors are caught at compile time, not runtime
+- **Fast** — bytecode VM written in Go, ~3x faster than the original interpreter
+- **Simple syntax** — clean, readable, no unnecessary complexity
+- **Module-first** — designed around writing and sharing focused function libraries
+- **Cross-platform** — runs on Windows, Linux, and macOS
 
 ---
 
 ## Installation
-Download the latest release and run `QuillInstaller.exe`. During installation you can opt in to adding Quill to your system PATH, which lets you run `.quill` files from any terminal:
+
+Download the latest release for your platform from the [releases page](../../releases).
+
+### Windows
+Run `QuillInstaller.exe` — optionally adds `quill` and `quill-c` to your PATH during install.
+
+### Linux / macOS
+```bash
+chmod +x quill
+./quill myfile.qsc
+```
+
+---
+
+## Usage
 
 ```bash
-quill myfile.quill
+# run a source file directly
+quill myfile.qsc
+
+# compile to bytecode
+quill-c myfile.qsc output.qbc
+
+# run precompiled bytecode
+quill output.qbc
 ```
 
 ---
 
-## Variables
-Variables are declared and reassigned using the `let` keyword. There is no separate reassignment keyword — `let` handles both.
+## Language Tour
+
+### Variables
+
+Variables are declared with `let` (immutable) or `mut` (mutable). Type annotations are supported.
 
 ```quill
-let name = "Alice";
-let name = "Bob";
+let x: int = 5;
+let name: str = "Alice";
+let pi: float = 3.14;
+let active: bool = true;
+mut counter: int = 0;
 ```
 
-Quill supports the following value types:
-
-- **Integers** — `let x = 10;`
-- **Floats** — `let pi = 3.14;`
-- **Strings** — `let name = "Alice";`
-- **Booleans** — `let t = True;` / `let f = False;`
-
-Semicolons are optional but recommended for readability.
+Semicolons are optional but recommended.
 
 ---
 
-## Printing
-Quill has two ways to print output:
+### Printing
 
-**`say`** — Used for printing plain string literals.
 ```quill
 say "Hello, world!";
-```
-
-**`printf`** — Used when you want to include a variable or expression in the output. The content is enclosed in parentheses.
-```quill
-let name = "Alice";
 printf("Hello " + name);
 ```
 
-String concatenation is done with the `+` operator.
+String concatenation uses `+`. Any type can be concatenated with a string.
 
 ---
 
-## Conditionals
-Quill supports `if` / `else if` / `else` blocks. The condition is written directly after the keyword with no parentheses required.
+### Arithmetic
 
 ```quill
-let i = 15;
-if i > 10 {
-    say "i is greater than 10";
-} else if i < 10 {
-    say "i is less than 10";
+let sum = 10 + 5;
+let diff = 10 - 3;
+let product = 6 * 7;
+let quotient = 20 / 4;
+let remainder = 7 % 3;
+```
+
+---
+
+### Conditionals
+
+No parentheses required around conditions.
+
+```quill
+let score: int = 75;
+
+if score >= 90 {
+    say "Grade: A";
+} else if score >= 75 {
+    say "Grade: B";
+} else if score >= 60 {
+    say "Grade: C";
 } else {
-    say "i is exactly 10";
+    say "Grade: F";
 }
 ```
 
-Supported comparison operators: `>` `<` `>=` `<=` `==` `!=`
-
-Logical operators `&&` and `||` are also supported in conditions:
-
-```quill
-let sunny = True;
-let warm = True;
-
-if sunny == 1 && warm == 1 {
-    say "Great day for a walk";
-}
-```
+Supported operators: `>` `<` `>=` `<=` `==` `!=` `&&` `||` `!`
 
 ---
 
-## Loops
-Quill supports `while` loops. The loop runs as long as the condition is true.
+### Loops
 
 ```quill
-let i = 0;
+let i: int = 0;
 while i < 10 {
     printf("i: " + i);
-    let i = i + 1;
+    i++;
 }
 ```
 
 ---
 
-## Functions
-Functions are defined with the `func` keyword, followed by the function name and its parameters in parentheses. They are called by name with arguments passed in parentheses.
+### Functions
+
+Functions must be declared before they are called. Type annotations on parameters and return type are supported.
 
 ```quill
-func greet(arg) {
-    printf("Hello " + arg);
+func add(a: int, b: int): int {
+    return a + b;
 }
 
-let name = "Alice";
-greet(name);
-```
-
-Functions can accept multiple parameters:
-
-```quill
-func add(a, b) {
-    printf(a + b);
+func greet(name: str): str {
+    return "Hello, " + name;
 }
 
-add(3, 4);
+let result: int = add(3, 4);
+say greet("Alice");
 ```
-
-> **Note:** Variables declared inside a function do not leak into the outer scope.
 
 ---
 
-## Incrementation
-Quill supports `++` and `--` postfix operators for incrementing and decrementing variables.
+### Incrementation
 
 ```quill
-let i = 0;
-i++;
-i++;
-printf(i); # 2
-
-i--;
-printf(i); # 1
+let i: int = 0;
+i++;   # increment
+i--;   # decrement
 ```
 
-You can also increment manually:
+---
+
+### Comments
 
 ```quill
-let i = i + 1;
+# this is a comment
+let x: int = 5; # inline comment
+```
+
+---
+
+## Type System
+
+Quill is statically typed. The type checker runs before bytecode compilation and reports all errors before execution.
+
+| Type | Example |
+|------|---------|
+| `int` | `42` |
+| `float` | `3.14` |
+| `str` | `"hello"` |
+| `bool` | `true` / `false` |
+| `void` | functions with no return value |
+
+### Type errors caught at compile time
+
+```quill
+let x: int = "hello";
+# TypeError: cannot assign str to int — 'x'
+
+func add(a: int, b: int): int { return a + b; }
+add(1, "two");
+# TypeError: argument 2 of 'add' expects int but got str
 ```
 
 ---
 
 ## Standard Library
-Quill ships with a small set of built-in functions:
 
-| Function | Description | Example |
+| Function | Description | Returns |
 |----------|-------------|---------|
-| `sqrt(n)` | Square root of n | `sqrt(144)` → `12` |
-| `len(s)` | Length of a string | `len("hello")` → `5` |
-| `random()` | Random float between 0 and 1 | `random()` |
-| `timeNow()` | Current date and time as a string | `timeNow()` |
-| `push(arr, val)` | Appends a value to an array | `push(arr, 1)` |
+| `len(s)` | Length of a string or array | `int` |
+| `toString(x)` | Convert any value to string | `str` |
 
-```quill
-let root = sqrt(144);
-printf("sqrt(144) = " + root);
-
-let size = len("Quill");
-printf("length = " + size);
-
-let now = timeNow();
-printf("time: " + now);
-```
+More stdlib functions coming in future releases.
 
 ---
 
-## Comments
-Comments start with `#` and run to the end of the line. They are ignored during execution.
+## Bytecode Format
 
-```quill
-# This is a comment
-let x = 5; # inline comment
+Quill source files use the `.qsc` extension. Compiled bytecode files use `.qbc`.
+
+```bash
+quill-c myfile.qsc myfile.qbc   # compile
+quill myfile.qbc                 # run bytecode directly
+quill myfile.qsc                 # compile and run in one step
 ```
+
+The `.qbc` format is a binary format with:
+- Magic header `QBC`
+- Version byte for compatibility checking
+- Constants pool
+- Instruction stream
+- Embedded function table
 
 ---
 
 ## Quick Reference
+
 | Feature | Syntax |
 |---------|--------|
-| Variable | `let x = value;` |
+| Immutable variable | `let x: int = 5;` |
+| Mutable variable | `mut x: int = 5;` |
 | Print literal | `say "text";` |
-| Print with var | `printf("text" + var);` |
+| Print expression | `printf("text" + var);` |
 | If | `if condition { }` |
 | Else if | `else if condition { }` |
 | Else | `else { }` |
 | While loop | `while condition { }` |
-| Function def | `func name(arg) { }` |
+| Function def | `func name(a: type): returnType { }` |
 | Function call | `name(arg);` |
 | Increment | `i++;` |
 | Decrement | `i--;` |
 | Comment | `# text` |
-| Square root | `sqrt(n)` |
-| String length | `len(s)` |
-| Random | `random()` |
-| Time | `timeNow()` |
+| Compile | `quill-c file.qsc file.qbc` |
+| Run source | `quill file.qsc` |
+| Run bytecode | `quill file.qbc` |
 
 ---
 
 ## Versioning
+
 Quill uses a 4-part versioning system: `MAJOR.MINOR.PATCH.STATUS`
 
 | STATUS | Meaning |
 |--------|---------|
 | `1` | Beta |
-| `2` | Alomost |
+| `2` | Meh |
 | `3` | Pre-release |
 
-Current version: **0.0.3.3**
+Current version: **0.0.4.1**
+
+---
+
+## Building from Source
+
+Requires Go 1.26+.
+
+```bash
+git clone https://github.com/your-username/interperter.git
+cd interperter
+./build.ps1              # Windows — builds quill.exe and quill-c.exe
+./build.ps1 -Target all  # all platforms
+./build.ps1 -Clean       # remove bin/
+```
+
+---
+
+## Project Structure
+
+```
+quill-go/
+├── cmd/
+│   ├── quill/             # quill runner entry point
+│   └── quill-c/           # quill-c compiler entry point
+├── src/
+│   └── core/
+│       ├── ast/           # AST node definitions
+│       ├── bytecode/      # bytecode format and serialization
+│       ├── compiler/      # bytecode compiler
+│       ├── lexer/         # tokenizer
+│       ├── parser/        # AST builder
+│       ├── typechecker/   # static type checking
+│       ├── types/         # token types
+│       └── vm/            # bytecode virtual machine
+├── bin/                   # compiled binaries
+├── tests/                 # .qsc test files
+├── build.ps1              # build script
+├── go.mod
+└── README.md
+```
+
+---
+
+## Roadmap
+
+- [ ] Hashmaps / objects
+- [ ] String methods (`split`, `trim`, `replace`, `toUpper`, `toLower`)
+- [ ] Arrays (in progress)
+- [ ] Error handling (`try` / `catch`)
+- [ ] HTTP standard library
+- [ ] File I/O
+- [ ] Module / import system
+- [ ] Package registry
+
+---
+
+## License
+
+MIT

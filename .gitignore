@@ -13,9 +13,8 @@ versions
 releases
 
 # Build output
-dest/
-releases/
-
+.bin
+.bin-zip
 # Executables
 *.exe
 quill-linux

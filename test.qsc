@@ -1,0 +1,25 @@
+# Fibonacci calculator — exercises functions, loops, conditionals,
+# arithmetic, variables, mutation, and printing
+
+func fib(n: int): int {
+    if n <= 1 {
+        return n
+    }
+    let a: int = 0
+    let b: int = 1
+    let i: int = 2
+    while i <= n {
+        let temp: int = a + b
+        a = b
+        b = temp
+        i++
+    }
+    return b
+}
+
+let count: int = 100
+let idx: int = 0
+while idx <= count {
+    printf fib(idx)
+    idx++
+}
