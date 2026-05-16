@@ -20,6 +20,9 @@ releases
 quill-linux
 quill-macos-intel
 quill-macos-arm
+quill-c-linux
+quill-c-macos-intel
+quill-c-macos-arm
 
 # Misc
 .DS_Store
