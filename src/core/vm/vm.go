@@ -3,6 +3,7 @@ package vm
 import (
 	"fmt"
 	"quill/src/core/bytecode"
+	"time"
 )
 
 // ─── VM ──────────────────────────────────────────────────────────────────────
@@ -126,71 +127,101 @@ func (vm *VM) Run() error {
 			vm.globals[name] = val
 
 		case bytecode.OP_ADD:
-			b := vm.pop()
-			a := vm.pop()
-			vm.push(vm.addValues(a, b))
+    			b := vm.pop()
+    			a := vm.pop()
+    			if a.Type == bytecode.VAL_INT && b.Type == bytecode.VAL_INT {
+        			vm.push(bytecode.Value{Type: bytecode.VAL_INT, AsInt: a.AsInt + b.AsInt})
+        			continue
+    			}
+    			vm.push(vm.addValues(a, b))
 
 		case bytecode.OP_SUB:
 			b := vm.pop()
 			a := vm.pop()
+			if a.Type == bytecode.VAL_INT && b.Type == bytecode.VAL_INT {
+				vm.push(bytecode.Value{Type: bytecode.VAL_INT, AsInt: a.AsInt - b.AsInt})
+				continue
+			}
 			vm.push(vm.subValues(a, b))
 
 		case bytecode.OP_MUL:
-			b := vm.pop()
-			a := vm.pop()
-			vm.push(vm.mulValues(a, b))
+		    	b := vm.pop()
+		    	a := vm.pop()
+		    	if a.Type == bytecode.VAL_INT && b.Type == bytecode.VAL_INT {
+				vm.push(bytecode.Value{Type: bytecode.VAL_INT, AsInt: a.AsInt * b.AsInt})
+				continue
+		    	}
+		    	vm.push(vm.mulValues(a, b))
 
 		case bytecode.OP_DIV:
-			b := vm.pop()
-			a := vm.pop()
-			if vm.isZero(b) {
+		    	b := vm.pop()
+		    	a := vm.pop()
+		    	if a.Type == bytecode.VAL_INT && b.Type == bytecode.VAL_INT {
+				if b.AsInt == 0 {
+			    		return fmt.Errorf("division by zero")
+				}
+				vm.push(bytecode.Value{Type: bytecode.VAL_INT, AsInt: a.AsInt / b.AsInt})
+				continue
+		    	}
+		    	if vm.isZero(b) {
 				return fmt.Errorf("division by zero")
-			}
-			vm.push(vm.divValues(a, b))
-
-		case bytecode.OP_MOD:
-			b := vm.pop()
-			a := vm.pop()
-			if vm.isZero(b) {
-				return fmt.Errorf("modulo by zero")
-			}
-			vm.push(vm.modValues(a, b))
-
-		case bytecode.OP_NEG:
-			v := vm.pop()
-			vm.push(vm.negValue(v))
-
-		case bytecode.OP_EQ:
-			b := vm.pop()
-			a := vm.pop()
-			vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: vm.valuesEqual(a, b)})
-
-		case bytecode.OP_NE:
-			b := vm.pop()
-			a := vm.pop()
-			vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: !vm.valuesEqual(a, b)})
+		    	}
+		    	vm.push(vm.divValues(a, b))
 
 		case bytecode.OP_LT:
-			b := vm.pop()
-			a := vm.pop()
-			vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: vm.compareValues(a, b) < 0})
+		    	b := vm.pop()
+		    	a := vm.pop()
+		    	if a.Type == bytecode.VAL_INT && b.Type == bytecode.VAL_INT {
+				vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: a.AsInt < b.AsInt})
+				continue
+		    	}
+		    	vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: vm.compareValues(a, b) < 0})
 
 		case bytecode.OP_GT:
-			b := vm.pop()
-			a := vm.pop()
-			vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: vm.compareValues(a, b) > 0})
+		    	b := vm.pop()
+		    	a := vm.pop()
+		    	if a.Type == bytecode.VAL_INT && b.Type == bytecode.VAL_INT {
+				vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: a.AsInt > b.AsInt})
+				continue
+		    	}
+		    	vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: vm.compareValues(a, b) > 0})
 
 		case bytecode.OP_LE:
-			b := vm.pop()
-			a := vm.pop()
-			vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: vm.compareValues(a, b) <= 0})
+		    	b := vm.pop()
+		    	a := vm.pop()
+		    	if a.Type == bytecode.VAL_INT && b.Type == bytecode.VAL_INT {
+				vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: a.AsInt <= b.AsInt})
+				continue
+		    	}
+		    	vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: vm.compareValues(a, b) <= 0})
 
 		case bytecode.OP_GE:
-			b := vm.pop()
-			a := vm.pop()
-			vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: vm.compareValues(a, b) >= 0})
+		    	b := vm.pop()
+		    	a := vm.pop()
+		    	if a.Type == bytecode.VAL_INT && b.Type == bytecode.VAL_INT {
+				vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: a.AsInt >= b.AsInt})
+				continue
+		    	}
+		    	vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: vm.compareValues(a, b) >= 0})
 
-		case bytecode.OP_AND:
+		case bytecode.OP_EQ:
+		    	b := vm.pop()
+		    	a := vm.pop()
+		    	if a.Type == bytecode.VAL_INT && b.Type == bytecode.VAL_INT {
+				vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: a.AsInt == b.AsInt})
+				continue
+		    	}
+		    	vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: vm.valuesEqual(a, b)})
+
+		case bytecode.OP_NE:
+		    	b := vm.pop()
+		    	a := vm.pop()
+		    	if a.Type == bytecode.VAL_INT && b.Type == bytecode.VAL_INT {
+				vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: a.AsInt != b.AsInt})
+				continue
+		    	}
+		    	vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: !vm.valuesEqual(a, b)})
+				case bytecode.OP_AND:
 			b := vm.pop()
 			a := vm.pop()
 			vm.push(bytecode.Value{Type: bytecode.VAL_BOOL, AsBool: vm.isTruthy(a) && vm.isTruthy(b)})
@@ -520,6 +551,14 @@ func (vm *VM) callBuiltin(name string, arity int) error {
 		fmt.Print(vm.valueToString(val))
 		// FIXED: Push nil return value to keep stack balanced
 		vm.push(bytecode.Value{Type: bytecode.VAL_NIL})
+
+	case "timeNow":
+		if arity != 0 {
+			return fmt.Errorf(" 'timeNow' expects 0 arguments, got %d", arity)
+		}
+		now := float64(time.Now().UnixNano()) / 1e6
+		vm.push(bytecode.Value{Type: bytecode.VAL_FLOAT, AsFloat: now})
+
 	case "len":
 		if arity != 1 {
 			return fmt.Errorf("'len' expects 1 argument, got %d", arity)

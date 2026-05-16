@@ -14,7 +14,7 @@ releases
 
 # Build output
 .bin
-.bin-zip
+*.zip
 # Executables
 *.exe
 quill-linux

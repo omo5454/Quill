@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+
 )
 
 // ─── Value Types ─────────────────────────────────────────────────────────────
@@ -19,14 +20,13 @@ const (
 )
 
 type Value struct {
-	Type     int
-	AsInt    int64
-	AsFloat  float64
-	AsBool   bool
-	AsString string
-	AsArray  []Value
-}
-
+    Type     int
+    AsInt    int64
+    AsFloat  float64
+    AsBool   bool
+    AsString string
+    AsArray  []Value
+    }
 // ─── Instruction ─────────────────────────────────────────────────────────────
 
 type Instruction struct {

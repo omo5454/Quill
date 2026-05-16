@@ -18,7 +18,7 @@ param(
 $BinDir     = "bin"
 $QuillSrc   = "./cmd/quill"
 $QuillcSrc  = "./cmd/quill-c"
-$Version    = "0.0.4.1"
+$Version    = "1.1.3.1"
 
 # ---- Helpers ----------------------------------------------------------------
 
