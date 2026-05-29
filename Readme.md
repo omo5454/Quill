@@ -236,29 +236,28 @@ The `.qbc` format is a binary format with:
 ---
 
 ## Versioning
-
-Quill uses a 4-part versioning system: `MAJOR.MINOR.PATCH.STATUS`
-
-| STATUS | Meaning |
-|--------|---------|
-| `1` | Beta |
-| `2` | Meh |
-| `3` | Pre-release |
-
-Current version: **0.0.4.1**
+Current version: **1.3.4**
 
 ---
 
 ## Building from Source
 
 Requires Go 1.26+.
-
+### Windows
 ```bash
-git clone https://github.com/your-username/interperter.git
-cd interperter
+git clone https://github.com/omrimorgan5-hub/Quill.git
+cd Quill
 ./build.ps1              # Windows — builds quill.exe and quill-c.exe
 ./build.ps1 -Target all  # all platforms
 ./build.ps1 -Clean       # remove bin/
+```
+### Linux and macOS
+```bash
+git clone https://github.com/omrimorgan5-hub/Quill.git
+cd Quill
+./build.sh               # Linux — builds quill-linux and quill-c-linux (can and should be renamed on your system for use)
+./build.sh -t all        # all platforms
+./build.sh -c            # remove bin/
 ```
 
 ---
@@ -266,7 +265,7 @@ cd interperter
 ## Project Structure
 
 ```
-quill-go/
+Quill/
 ├── cmd/
 │   ├── quill/             # quill runner entry point
 │   └── quill-c/           # quill-c compiler entry point
@@ -280,9 +279,10 @@ quill-go/
 │       ├── typechecker/   # static type checking
 │       ├── types/         # token types
 │       └── vm/            # bytecode virtual machine
-├── bin/                   # compiled binaries
+├── bin/                   # compiled binaries (hidden to the repo)
 ├── tests/                 # .qsc test files
 ├── build.ps1              # build script
+├── build.sh               # build script for linux or macOS
 ├── go.mod
 └── README.md
 ```
@@ -295,10 +295,9 @@ quill-go/
 - [ ] String methods (`split`, `trim`, `replace`, `toUpper`, `toLower`)
 - [ ] Arrays (in progress)
 - [ ] Error handling (`try` / `catch`)
-- [ ] HTTP standard library
 - [ ] File I/O
-- [ ] Module / import system
-- [ ] Package registry
+- [x] Module / import system
+- [x] Package registry(uses github repos)
 
 ---
 

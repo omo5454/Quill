@@ -83,6 +83,10 @@ while [[ $# -gt 0 ]]; do
             CLEAN=true
             shift
             ;;
+        -v|--version)
+            "quill-linux" --version
+            exit 0
+            ;;
         *)
             write_fail "Unknown option: $1"
             echo -e "${COLOR_GRAY}Valid options: -t|--target [win|linux|mac|mac-arm|all], -c|--clean${COLOR_RESET}"

@@ -14,12 +14,17 @@ import (
 )
 
 func main() {
-	debug := flag.Bool("debug", false, "Enable debug output")
-	flag.Parse()
 
+	debug := flag.Bool("debug", false, "Enable debug output")
+	version := flag.Bool("version", false, "Display language version")
+	flag.Parse()
+	if *version {
+		fmt.Println("Quill version: 1.3.1")
+		os.Exit(0)
+	}
 	args := flag.Args()
 	if len(args) < 1 {
-		fmt.Println("Usage: quill [--debug] <file.qsc|file.qbc>")
+		fmt.Println("Usage: quill [--debug] [--version] <file.qsc|file.qbc>")
 		os.Exit(1)
 	}
 
