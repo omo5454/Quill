@@ -291,6 +291,7 @@ func (tc *TypeChecker) checkNode(node ast.Node) string {
 			case "timeNow":
 				if len(n.Arguments) != 0 {
 					tc.errors = append(tc.errors, "TypeError: 'timNow' expects 0 arguments")
+				}
 			default:
 				tc.errors = append(tc.errors,
 					fmt.Sprintf("TypeError: unknown function '%s'", n.Callee))

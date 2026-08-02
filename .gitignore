@@ -23,7 +23,12 @@ quill-macos-arm
 quill-c-linux
 quill-c-macos-intel
 quill-c-macos-arm
+main2
+main
+test2.c
+test.c
 
 # Misc
 .DS_Store
 Thumbs.db
+src-t/
