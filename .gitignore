@@ -1,5 +1,8 @@
 node_modules
-
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
 *.iss
 
 info.txt
@@ -13,7 +16,7 @@ versions
 releases
 
 # Build output
-bin
+bin/
 *.zip
 # Executables
 *.exe
@@ -27,6 +30,11 @@ main2
 main
 test2.c
 test.c
+
+# Test artifacts
+*.tmp
+*.log
+tests/.tmp/
 
 # Misc
 .DS_Store
