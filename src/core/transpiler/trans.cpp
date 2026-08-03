@@ -1045,6 +1045,10 @@ int main(int argc, char** argv) {
     try {
         TypeChecker checker;
         checker.check(program);
+        if (debug) {
+            std::cout << "=== TYPE CHECKING ===\n";
+            std::cout << "  type checking passed\n";
+        }
     } catch (const std::exception& ex) {
         std::cerr << "Type error: " << ex.what() << "\n";
         return 1;
@@ -1098,7 +1102,7 @@ int main(int argc, char** argv) {
         binaryPath = outputPath.substr(0, outputPath.size() - 2);
     }
 
-    std::string gccCommand = "gcc -std=c11 -Wall -Wextra -pedantic \"" + cPath + "\" -o \"" + binaryPath + "\"";
+    std::string gccCommand = "gcc -std=c11 -Wall -Wextra -pedantic -Wno-unused-function \"" + cPath + "\" -o \"" + binaryPath + "\"";
     int result = std::system(gccCommand.c_str());
     if (result != 0) {
         std::cerr << "failed to compile generated C: " << cPath << "\n";

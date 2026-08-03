@@ -412,6 +412,8 @@ int main(int argc, char** argv) {
             std::cout << "  statements: " << program.body.size() << "\n";
         }
 
+        std::cout << "Made it past parser" << std::endl;
+
         TypeChecker checker;
         checker.check(program);
 
