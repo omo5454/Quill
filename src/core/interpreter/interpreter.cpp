@@ -240,6 +240,34 @@ private:
             return RuntimeValue{};
         }
 
+        if (auto* inc = dynamic_cast<Increment*>(node)) {
+            auto it = env_.find(inc->identifier);
+            if (it == env_.end()) {
+                throw std::runtime_error("undefined identifier: " + inc->identifier);
+            }
+            if (it->second.type == ValueType::Float) {
+                it->second.asFloat += 1.0;
+            }
+            else {
+                it->second.asInt += 1;
+            }
+            return RuntimeValue{};
+        }
+
+        if (auto* dec = dynamic_cast<Decrement*>(node)) {
+            auto it = env_.find(dec->identifier);
+            if (it == env_.end()) {
+                throw std::runtime_error("undefined identifier: " + dec->identifier);
+            }
+            if (it->second.type == ValueType::Float) {
+                it->second.asFloat -= 1.0;
+            }
+            else {
+                it->second.asInt -= 1;
+            }
+            return RuntimeValue{};
+        }
+
         if (auto* ret = dynamic_cast<ReturnStatement*>(node)) {
             return ret->value ? evaluateExpression(ret->value) : RuntimeValue{};
         }

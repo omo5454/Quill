@@ -276,7 +276,13 @@ private:
         if (peek().value == "++" || peek().value == "--") {
             advance();
             if (peek().value == "++") {
-                // handled by parseExpression edge if necessary
+                auto* node = new Increment();
+                node->identifier = name;
+                return node;
+            } else {
+                auto* node = new Decrement();
+                node->identifier = name;
+                return node;
             }
         }
 
