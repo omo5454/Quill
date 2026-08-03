@@ -274,8 +274,8 @@ private:
         }
 
         if (peek().value == "++" || peek().value == "--") {
-            advance();
-            if (peek().value == "++") {
+            std::string op = advance().value;
+            if (op == "++") {
                 auto* node = new Increment();
                 node->identifier = name;
                 return node;
