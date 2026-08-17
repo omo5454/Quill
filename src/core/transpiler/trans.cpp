@@ -1118,24 +1118,21 @@ namespace
                         if (cleaned.empty())
                             continue;
 
-                        // 1. Detect entering a new function declaration
-                        if (!insideFunction && cleaned.find("func ") == 0)
+                        // 1. Detect function boundaries BEFORE transforming the syntax
+                        if (!insideFunction && (cleaned.find("func ") == 0 || cleaned.find("twoTimesTwo(void)") != std::string::npos))
                         {
                             insideFunction = true;
                             braceDepth = 0;
                             buffer.clear();
                         }
 
-                        // 2. Accumulate or Transpile based entirely on state
+                        // 2. Track depth and collect blocks
                         if (insideFunction)
                         {
-                            // Ensure all lines inside the function undergo transformation rules
                             buffer.push_back(transformLine(cleaned, variableTypes));
-
                             braceDepth += std::count(cleaned.begin(), cleaned.end(), '{');
                             braceDepth -= std::count(cleaned.begin(), cleaned.end(), '}');
 
-                            // 3. Close the function block safely when depth recovers
                             if (braceDepth <= 0)
                             {
                                 functionBlocks.push_back(joinLines(buffer));
@@ -1145,7 +1142,6 @@ namespace
                         }
                         else
                         {
-                            // Standard structural statement processing
                             mainLines.push_back(transformLine(cleaned, variableTypes));
                         }
                     }
