@@ -1,13 +1,13 @@
 # Quill
 
-Quill is a statically typed, bytecode-compiled scripting language designed for clarity, speed, and shareable function modules. It compiles to a binary `.qbc` bytecode format and runs on a purpose-built VM written in Go.
+Quill is a statically typed, bytecode-compiled/transpiled scripting language designed for clarity, speed, and shareable function modules. It runs on a purpose-built Interpreter written in C++.
 
 ---
 
 ## Why Quill?
 
 - **Statically typed** — type errors are caught at compile time, not runtime
-- **Fast** — bytecode VM written in Go, ~3x faster than the original interpreter
+- **Fast** — Interpreter written in C++, ~3x faster than the original interpreter (Transpiler makes code as fast as C)
 - **Simple syntax** — clean, readable, no unnecessary complexity
 - **Module-first** — designed around writing and sharing focused function libraries
 - **Cross-platform** — runs on Windows, Linux, and macOS
@@ -33,13 +33,13 @@ chmod +x quill
 
 ```bash
 # run a source file directly
-quill myfile.qsc
+quill-c myfile.qsc
 
-# compile to bytecode
-quill-c myfile.qsc output.qbc
+# Or use quill --interpret
+quill --interpret myfile.qsc
 
-# run precompiled bytecode
-quill output.qbc
+# Or transpile to C and auto compile
+quill --compile myfile.qsc
 ```
 
 ---
@@ -198,17 +198,9 @@ More stdlib functions coming in future releases.
 Quill source files use the `.qsc` extension. Compiled bytecode files use `.qbc`.
 
 ```bash
-quill-c myfile.qsc myfile.qbc   # compile
-quill myfile.qbc                 # run bytecode directly
-quill myfile.qsc                 # compile and run in one step
+quill --compile myfile.qsc                   # transpile and compile
+quill --interpret myfile.qsc                 # run sourcecode directly
 ```
-
-The `.qbc` format is a binary format with:
-- Magic header `QBC`
-- Version byte for compatibility checking
-- Constants pool
-- Instruction stream
-- Embedded function table
 
 ---
 
@@ -242,7 +234,7 @@ Current version: **1.3.4**
 
 ## Building from Source
 
-Requires Go 1.26+.
+Requires C++ 17+.
 ### Windows
 ```bash
 git clone https://github.com/omrimorgan5-hub/Quill.git
@@ -267,24 +259,22 @@ cd Quill
 ```
 Quill/
 ├── cmd/
-│   ├── quill/             # quill runner entry point
-│   └── quill-c/           # quill-c compiler entry point
+│   ├── quill/                 # quill AIO entry point
+│   └── quill-c/               # quill-c Interpreter entry point
 ├── src/
 │   └── core/
-│       ├── ast/           # AST node definitions
-│       ├── bytecode/      # bytecode format and serialization
-│       ├── compiler/      # bytecode compiler
-│       ├── lexer/         # tokenizer
-│       ├── parser/        # AST builder
-│       ├── typechecker/   # static type checking
-│       ├── types/         # token types
-│       └── vm/            # bytecode virtual machine
-├── bin/                   # compiled binaries (hidden to the repo)
-├── tests/                 # .qsc test files
-├── build.ps1              # build script
-├── build.sh               # build script for linux or macOS
-├── go.mod
-└── README.md
+│       ├── ast/               # AST node definitions
+│       ├── interpreter/       # bytecode format and serialization
+│       ├── lexer/             # tokenizer
+│       ├── parser/            # AST builder
+│       ├── transpiler/        # Quill to C transpiler
+│       ├── typechecker/       # static type checking
+│       └── types/             # token types
+├── bin/                       # compiled binaries (hidden to the repo)
+├── tests/                     # .qsc test files
+├── build.ps1                  # build script
+├── build.sh                   # build script for linux or macOS
+└── README.md                  # you're reading it
 ```
 
 ---

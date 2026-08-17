@@ -1,8 +1,0 @@
-let result: int = 1;
-let n: int = 5;
-while n > 1 {
-    result = result * n;
-    n--;
-}
-
-printf(result);

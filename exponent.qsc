@@ -1,0 +1,20 @@
+let n: int = 2;
+let x: float = 8.0;
+
+let N: int = n;
+if(N < 0) {
+    x = 1 / x;
+    N = -N;
+}
+
+let res: float = 1.0;
+while(N > 0){
+    if(N % 2 == 1) {
+        res = res * x;
+    }
+
+    x = x * x;
+    N = N / 2;
+}
+
+print("%f\n", res);

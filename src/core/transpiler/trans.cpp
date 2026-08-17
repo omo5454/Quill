@@ -552,23 +552,7 @@ std::string emitPrintCall(const std::string& expr, const std::map<std::string, s
     if (normalized == "true") normalized = "1";
     if (normalized == "false") normalized = "0";
 
-    std::string valueType = inferExpressionType(value, variableTypes);
-    if (valueType == "str") {
-        if (value.find('+') != std::string::npos) {
-            return "printf(\"%s\", " + buildConcatCall(value) + ");";
-        }
-        return "printf(\"%s\", " + value + ");";
-    }
-
-    if (valueType == "float") {
-        return "printf(\"%f\\n\", " + normalized + ");";
-    }
-
-    if (valueType == "bool") {
-        return "printf(\"%d\\n\", " + normalized + ");";
-    }
-
-    return "printf(\"%d\\n\", " + normalized + ");";
+    return "printf(" + value + ");";
 }
 
 std::string emitSayCall(const std::string& expr, const std::map<std::string, std::string>& variableTypes) {
