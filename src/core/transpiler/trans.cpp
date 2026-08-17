@@ -1118,7 +1118,7 @@ namespace
                         if (cleaned.empty())
                             continue;
 
-                        // 1. Detect the start of a function definition
+                        // 1. Detect entering a new function declaration
                         if (!insideFunction && cleaned.find("func ") == 0)
                         {
                             insideFunction = true;
@@ -1126,14 +1126,16 @@ namespace
                             buffer.clear();
                         }
 
-                        // 2. Route the line to the correct destination buffer
+                        // 2. Accumulate or Transpile based entirely on state
                         if (insideFunction)
                         {
+                            // Ensure all lines inside the function undergo transformation rules
                             buffer.push_back(transformLine(cleaned, variableTypes));
+
                             braceDepth += std::count(cleaned.begin(), cleaned.end(), '{');
                             braceDepth -= std::count(cleaned.begin(), cleaned.end(), '}');
 
-                            // 3. Close the function block safely
+                            // 3. Close the function block safely when depth recovers
                             if (braceDepth <= 0)
                             {
                                 functionBlocks.push_back(joinLines(buffer));
@@ -1143,7 +1145,7 @@ namespace
                         }
                         else
                         {
-                            // Safely routes standard procedural code out of functions into main
+                            // Standard structural statement processing
                             mainLines.push_back(transformLine(cleaned, variableTypes));
                         }
                     }
