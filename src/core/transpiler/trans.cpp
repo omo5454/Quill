@@ -1127,19 +1127,17 @@ namespace
                         }
 
                         // 2. Track depth and collect blocks
-                        if (insideFunction)
+                        if (insideFunction && buffer.size() == 1)
                         {
-                            buffer.push_back(transformLine(cleaned, variableTypes));
-                            braceDepth += std::count(cleaned.begin(), cleaned.end(), '{');
-                            braceDepth -= std::count(cleaned.begin(), cleaned.end(), '}');
-
-                            if (braceDepth <= 0)
+                            // If the first line of our function block got mangled with a leading call
+                            size_t funcPos = cleaned.find("func ");
+                            if (funcPos != std::string::npos && funcPos > 0)
                             {
-                                functionBlocks.push_back(joinLines(buffer));
-                                insideFunction = false;
-                                buffer.clear();
+                                // Strip out the trailing call/junk that leaked before the 'func' keyword
+                                cleaned = cleaned.substr(funcPos);
                             }
                         }
+
                         else
                         {
                             mainLines.push_back(transformLine(cleaned, variableTypes));
