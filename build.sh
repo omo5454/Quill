@@ -29,14 +29,12 @@ build_cpp_binary() {
     local label="$3"
 
     echo "Building $label..."
-    if [[target == "linux" ]]; then
+    if [[TARGET == "linux" ]]; then
         g++ -std=c++17 "$src" -O2 -o "$BIN_DIR/$out"
     else
         g++ -std=c++17 "$src" -O2 -o "$BIN_DIR/quill-linux"
         x86_64-w64-mingw32-g++ -static -static-libgcc -static-libstdc++ "$src" -O2 -o "$BIN_DIR/quill-windows64.exe"
         i686-w64-mingw32-g++ -static -static-libgcc -static-libstdc++ "$src" -O2 -o "$BIN_DIR/quill-windows32.exe"
-        arm64-apple-darwin23-clang++ "$src" -o "$BIN_DIR/quill-mac-arm64"
-        x86_64-apple-darwin23-clang++ "$src" -o "$BIN_DIR/quill-mac-intel"
 
 
     fi

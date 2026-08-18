@@ -92,6 +92,16 @@ private:
             return;
         }
 
+        if (auto* idx = dynamic_cast<IndexExpression*>(node)) {
+            checkNode(idx->object);
+            checkNode(idx->index);
+            std::string objType = inferType(idx->object);
+            if (objType != "str") {
+                throw std::runtime_error("indexing with [] is only supported on str values");
+            }
+            return;
+        }
+
         if (auto* ident = dynamic_cast<Identifier*>(node)) {
             if (symbols.find(ident->name) == symbols.end()) {
                 throw std::runtime_error("undefined identifier: " + ident->name);
@@ -139,6 +149,10 @@ private:
             if (it != symbols.end()) return it->second;
             return "unknown";
         }
+
+        // Indexing a str with [] yields a character, represented the
+        // same way C represents char: as a small int.
+        if (dynamic_cast<IndexExpression*>(node)) return "int";
 
         if (auto* binary = dynamic_cast<BinaryExpression*>(node)) {
             std::string left = inferType(binary->left);
