@@ -17,4 +17,5 @@ func Pow(n: int, x: float){
     return res;
 }
 
-Pow(2, 8.0);
+
+printf(Pow(3, 8.0));

@@ -32,191 +32,6 @@ namespace
 
         return value.substr(start, end - start);
     }
-
-    std::string stripTrailingSemicolon(std::string value)
-    {
-        value = trim(value);
-        while (!value.empty() && value.back() == ';')
-        {
-            value.pop_back();
-            value = trim(value);
-        }
-        return value;
-    }
-
-    std::string buildConcatCall(const std::string &expr)
-    {
-        std::string value = stripTrailingSemicolon(expr);
-        std::vector<std::string> parts;
-        std::string current;
-        for (char c : value)
-        {
-            if (c == '+')
-            {
-                parts.push_back(trim(current));
-                current.clear();
-            }
-            else
-            {
-                current += c;
-            }
-        }
-        if (!current.empty())
-        {
-            parts.push_back(trim(current));
-        }
-
-        if (parts.empty())
-        {
-            return value;
-        }
-
-        std::string result = parts[0];
-        for (std::size_t i = 1; i < parts.size(); ++i)
-        {
-            result = "quill_concat(" + result + ", " + parts[i] + ")";
-        }
-        return result;
-    }
-
-    std::vector<std::string> splitLines(const std::string &text)
-    {
-        std::vector<std::string> lines;
-        std::stringstream stream(text);
-        std::string line;
-        while (std::getline(stream, line))
-        {
-            lines.push_back(line);
-        }
-        return lines;
-    }
-
-    std::vector<std::string> splitStatements(const std::string &input)
-    {
-        std::vector<std::string> statements;
-        std::string current;
-        bool inString = false;
-        int braceDepth = 0;
-        int parenDepth = 0;
-
-        for (char c : input)
-        {
-            if (c == '"')
-            {
-                current += c;
-                inString = !inString;
-                continue;
-            }
-
-            if (!inString)
-            {
-                if (c == '{')
-                {
-                    ++braceDepth;
-                }
-                else if (c == '}')
-                {
-                    if (braceDepth > 0)
-                        --braceDepth;
-                }
-                else if (c == '(')
-                {
-                    ++parenDepth;
-                }
-                else if (c == ')')
-                {
-                    if (parenDepth > 0)
-                        --parenDepth;
-                }
-            }
-
-            if (!inString && c == ';' && braceDepth == 0 && parenDepth == 0)
-            {
-                std::string stmt = trim(current);
-                if (!stmt.empty())
-                {
-                    statements.push_back(stmt);
-                }
-                current.clear();
-                continue;
-            }
-
-            current += c;
-        }
-
-        std::string tail = trim(current);
-        if (!tail.empty())
-        {
-            statements.push_back(tail);
-        }
-        return statements;
-    }
-
-    std::string stripComments(const std::string &text)
-    {
-        std::string result;
-        bool inString = false;
-        for (std::size_t i = 0; i < text.size(); ++i)
-        {
-            char c = text[i];
-            char next = (i + 1 < text.size()) ? text[i + 1] : '\0';
-
-            if (c == '"')
-            {
-                result += c;
-                inString = !inString;
-                continue;
-            }
-
-            if (!inString && c == '#')
-            {
-                while (i < text.size() && text[i] != '\n')
-                {
-                    ++i;
-                }
-                if (i < text.size())
-                {
-                    result += '\n';
-                }
-                continue;
-            }
-
-            if (!inString && c == '\n')
-            {
-                result += c;
-                continue;
-            }
-
-            result += c;
-        }
-        return result;
-    }
-
-    std::string joinLines(const std::vector<std::string> &lines)
-    {
-        std::ostringstream out;
-        for (const auto &line : lines)
-        {
-            if (!line.empty())
-            {
-                out << line << '\n';
-            }
-        }
-        return out.str();
-    }
-
-    std::string replaceAll(const std::string &input, const std::string &from, const std::string &to)
-    {
-        std::string result = input;
-        std::size_t pos = 0;
-        while ((pos = result.find(from, pos)) != std::string::npos)
-        {
-            result.replace(pos, from.size(), to);
-            pos += to.size();
-        }
-        return result;
-    }
-
     std::string convertTypeName(const std::string &typeName)
     {
         if (typeName == "int")
@@ -231,20 +46,6 @@ namespace
             return "void";
         return typeName;
     }
-
-    std::string toCExpression(const std::string &expr)
-    {
-        std::string value = trim(expr);
-        if (value.empty())
-            return value;
-
-        value = replaceAll(value, "==", "==");
-        value = replaceAll(value, "&&", "&&");
-        value = replaceAll(value, "||", "||");
-        value = replaceAll(value, "!", "!");
-        return value;
-    }
-
     enum class RuntimeType
     {
         Null,
@@ -607,7 +408,10 @@ namespace
             return RuntimeValue{};
         }
     };
-
+    // Maps any spelling of a Quill/C type name to Quill's own canonical
+    // name ("int", "float", "str", "bool", "void"). Unknown/future type
+    // names fall back to "int" so a typo doesn't crash the transpiler --
+    // the typechecker is responsible for catching genuine type errors.
     std::string normalizeTypeName(const std::string &typeName)
     {
         std::string type = trim(typeName);
@@ -619,41 +423,71 @@ namespace
             return "bool";
         if (type == "int")
             return "int";
+        if (type == "void")
+            return "void";
         return "int";
     }
 
-    std::string formatForType(const std::string &typeName)
-    {
-        std::string type = normalizeTypeName(typeName);
-        if (type == "str")
-            return "%s";
-        if (type == "float")
-            return "%f";
-        if (type == "bool")
-            return "%d";
-        return "%d";
-    }
+    // ------------------------------------------------------------------
+    // Type inference and per-scope symbol tables.
+    //
+    // The old transpiler re-scanned the raw source text for "let"/"mut"
+    // lines and built ONE flat, file-wide name -> type map. That has two
+    // problems that only show up once real programs are written by real
+    // people:
+    //   1. Two functions that both happen to use a variable called `x`
+    //      (or `i`, `result`, `total`, ...) stomp on each other's type,
+    //      because there's only one map for the whole file.
+    //   2. Function parameters were never added to that map at all, and
+    //      a `let` with no explicit `: type` was skipped entirely, so
+    //      both silently defaulted to `int` no matter what they held.
+    //
+    // Below, every function (and the top-level "main" body) gets its own
+    // scope, built straight from the AST: parameters come from
+    // Function::params, and each local's type comes from its own
+    // declaredType if it wrote one, or is inferred from its initializer
+    // if it didn't. Nothing is guessed from raw text.
+    // ------------------------------------------------------------------
 
-    std::string inferExpressionType(const std::string &expr, const std::map<std::string, std::string> &variableTypes)
+    std::string inferNodeType(Node *node,
+                               const std::map<std::string, std::string> &scope,
+                               const std::map<std::string, std::string> &functionReturnTypes)
     {
-        std::string value = stripTrailingSemicolon(trim(expr));
-        if (value.empty())
-        {
+        if (!node)
             return "void";
-        }
 
-        if (value.find('"') != std::string::npos)
-        {
+        if (dynamic_cast<LiteralInt *>(node))
+            return "int";
+        if (dynamic_cast<LiteralFloat *>(node))
+            return "float";
+        if (dynamic_cast<LiteralString *>(node))
             return "str";
+        if (dynamic_cast<LiteralBool *>(node))
+            return "bool";
+
+        if (auto *ident = dynamic_cast<Identifier *>(node))
+        {
+            auto it = scope.find(ident->name);
+            // The typechecker already rejects genuinely undefined
+            // identifiers before we ever get here, so a miss just means
+            // "not tracked in this scope" -- fall back to int rather
+            // than crash the transpiler.
+            return it != scope.end() ? it->second : "int";
         }
 
-        if (value.find('+') != std::string::npos)
+        if (auto *bin = dynamic_cast<BinaryExpression *>(node))
         {
-            std::string left = value.substr(0, value.find('+'));
-            std::string right = value.substr(value.find('+') + 1);
-            std::string leftType = inferExpressionType(left, variableTypes);
-            std::string rightType = inferExpressionType(right, variableTypes);
-            if (leftType == "str" || rightType == "str")
+            static const std::vector<std::string> comparisonOps = {
+                "==", "!=", "<", ">", "<=", ">=", "&&", "||"};
+            if (std::find(comparisonOps.begin(), comparisonOps.end(), bin->op) != comparisonOps.end())
+            {
+                return "bool";
+            }
+
+            std::string leftType = inferNodeType(bin->left, scope, functionReturnTypes);
+            std::string rightType = inferNodeType(bin->right, scope, functionReturnTypes);
+
+            if (bin->op == "+" && (leftType == "str" || rightType == "str"))
             {
                 return "str";
             }
@@ -664,557 +498,363 @@ namespace
             return "int";
         }
 
-        if (value == "true" || value == "false")
+        if (auto *unary = dynamic_cast<UnaryExpression *>(node))
         {
-            return "bool";
+            if (unary->op == "!")
+                return "bool";
+            return inferNodeType(unary->operand, scope, functionReturnTypes);
         }
 
-        if (value.find('.') != std::string::npos)
+        if (auto *call = dynamic_cast<CallExpression *>(node))
         {
-            return "float";
-        }
-
-        auto it = variableTypes.find(value);
-        if (it != variableTypes.end())
-        {
-            return normalizeTypeName(it->second);
-        }
-
-        if (std::all_of(value.begin(), value.end(), [](unsigned char ch)
-                        { return std::isdigit(ch); }))
-        {
-            return "int";
+            auto it = functionReturnTypes.find(call->callee);
+            return it != functionReturnTypes.end() ? it->second : "int";
         }
 
         return "int";
     }
 
-    std::string emitPrintCall(const std::string &expr, const std::map<std::string, std::string> &variableTypes)
+    void collectDeclaredLocals(const std::vector<Node *> &stmts,
+                                std::map<std::string, std::string> &scope,
+                                const std::map<std::string, std::string> &functionReturnTypes)
     {
-        std::string value = stripTrailingSemicolon(expr);
-
-        if (value.empty())
+        for (Node *node : stmts)
         {
-            return "printf(\"\\n\");";
-        }
-
-        std::string normalized = value;
-        if (normalized == "true")
-            normalized = "1";
-        if (normalized == "false")
-            normalized = "0";
-
-        return "printf(" + value + ");";
-    }
-
-    std::string emitSayCall(const std::string &expr, const std::map<std::string, std::string> &variableTypes)
-    {
-        return emitPrintCall(expr, variableTypes);
-    }
-
-    std::size_t findMatchingBrace(const std::string &text, std::size_t openPos)
-    {
-        if (openPos >= text.size() || text[openPos] != '{')
-        {
-            return std::string::npos;
-        }
-
-        int depth = 0;
-        for (std::size_t i = openPos; i < text.size(); ++i)
-        {
-            if (text[i] == '{')
-            {
-                ++depth;
-            }
-            else if (text[i] == '}')
-            {
-                --depth;
-                if (depth == 0)
-                {
-                    return i;
-                }
-            }
-        }
-        return std::string::npos;
-    }
-
-    std::string transformLine(const std::string &line, const std::map<std::string, std::string> &variableTypes);
-
-    std::vector<std::string> expandInlineBlock(const std::string &line, const std::map<std::string, std::string> &variableTypes)
-    {
-        std::string input = trim(line);
-        if (input.empty())
-        {
-            return {};
-        }
-
-        if (input.find("func ") == 0)
-        {
-            std::size_t bracePos = input.find('{');
-            if (bracePos != std::string::npos)
-            {
-                std::size_t closePos = findMatchingBrace(input, bracePos);
-                if (closePos != std::string::npos)
-                {
-                    std::vector<std::string> result;
-                    std::string header = trim(input.substr(0, bracePos + 1));
-                    result.push_back(transformLine(header, variableTypes));
-
-                    std::string body = trim(input.substr(bracePos + 1, closePos - bracePos - 1));
-                    std::string tail = trim(input.substr(closePos + 1));
-                    for (const std::string &stmt : splitStatements(body))
-                    {
-                        std::string cleaned = trim(stmt);
-                        if (!cleaned.empty())
-                        {
-                            result.push_back(transformLine(cleaned, variableTypes));
-                        }
-                    }
-                    result.push_back("}");
-
-                    if (!tail.empty())
-                    {
-                        for (const std::string &stmt : splitStatements(tail))
-                        {
-                            std::string cleaned = trim(stmt);
-                            if (!cleaned.empty())
-                            {
-                                result.push_back(transformLine(cleaned, variableTypes));
-                            }
-                        }
-                    }
-                    return result;
-                }
-            }
-        }
-
-        if (input.find("if ") == 0 || input.find("else if ") == 0)
-        {
-            std::size_t bracePos = input.find('{');
-            if (bracePos != std::string::npos)
-            {
-                std::size_t closePos = findMatchingBrace(input, bracePos);
-                if (closePos != std::string::npos)
-                {
-                    std::vector<std::string> result;
-                    std::string header = trim(input.substr(0, bracePos + 1));
-                    result.push_back(transformLine(header, variableTypes));
-
-                    std::string body = trim(input.substr(bracePos + 1, closePos - bracePos - 1));
-                    std::string tail = trim(input.substr(closePos + 1));
-                    for (const std::string &stmt : splitStatements(body))
-                    {
-                        std::string cleaned = trim(stmt);
-                        if (!cleaned.empty())
-                        {
-                            result.push_back(transformLine(cleaned, variableTypes));
-                        }
-                    }
-                    result.push_back("}");
-
-                    if (!tail.empty())
-                    {
-                        if (tail.find("else") == 0)
-                        {
-                            std::size_t elseBracePos = tail.find('{');
-                            if (elseBracePos != std::string::npos)
-                            {
-                                std::size_t elseClose = findMatchingBrace(tail, elseBracePos);
-                                if (elseClose != std::string::npos)
-                                {
-                                    std::string elseHeader = trim(tail.substr(0, elseBracePos + 1));
-                                    result.push_back(transformLine(elseHeader, variableTypes));
-                                    std::string elseBody = trim(tail.substr(elseBracePos + 1, elseClose - elseBracePos - 1));
-                                    for (const std::string &stmt : splitStatements(elseBody))
-                                    {
-                                        std::string cleaned = trim(stmt);
-                                        if (!cleaned.empty())
-                                        {
-                                            result.push_back(transformLine(cleaned, variableTypes));
-                                        }
-                                    }
-                                    result.push_back("}");
-                                }
-                            }
-                        }
-                    }
-                    return result;
-                }
-            }
-        }
-
-        if (input.find("else") == 0)
-        {
-            std::size_t bracePos = input.find('{');
-            if (bracePos != std::string::npos)
-            {
-                std::size_t closePos = findMatchingBrace(input, bracePos);
-                if (closePos != std::string::npos)
-                {
-                    std::vector<std::string> result;
-                    result.push_back(transformLine(trim(input.substr(0, bracePos + 1)), variableTypes));
-                    std::string body = trim(input.substr(bracePos + 1, closePos - bracePos - 1));
-                    for (const std::string &stmt : splitStatements(body))
-                    {
-                        std::string cleaned = trim(stmt);
-                        if (!cleaned.empty())
-                        {
-                            result.push_back(transformLine(cleaned, variableTypes));
-                        }
-                    }
-                    result.push_back("}");
-                    return result;
-                }
-            }
-        }
-
-        if (input.find("while ") == 0)
-        {
-            std::size_t bracePos = input.find('{');
-            if (bracePos != std::string::npos)
-            {
-                std::size_t closePos = findMatchingBrace(input, bracePos);
-                if (closePos != std::string::npos)
-                {
-                    std::vector<std::string> result;
-                    std::string header = trim(input.substr(0, bracePos + 1));
-                    result.push_back(transformLine(header, variableTypes));
-
-                    std::string body = trim(input.substr(bracePos + 1, closePos - bracePos - 1));
-                    for (const std::string &stmt : splitStatements(body))
-                    {
-                        std::string cleaned = trim(stmt);
-                        if (!cleaned.empty())
-                        {
-                            result.push_back(transformLine(cleaned, variableTypes));
-                        }
-                    }
-                    result.push_back("}");
-                    return result;
-                }
-            }
-        }
-
-        return {transformLine(line, variableTypes)};
-    }
-
-    std::string transformLine(const std::string &line, const std::map<std::string, std::string> &variableTypes)
-    {
-        std::string input = stripTrailingSemicolon(line);
-        if (input.empty())
-        {
-            return "";
-        }
-
-        if (input == "}")
-        {
-            return "}";
-        }
-
-        if (input == "{")
-        {
-            return "{";
-        }
-
-        if (input.find("func ") == 0)
-        {
-            std::string rest = trim(input.substr(5));
-            std::size_t lparen = rest.find('(');
-            std::size_t rparen = rest.find(')');
-            std::size_t colon = rest.rfind(':');
-            std::size_t brace = rest.rfind('{');
-
-            std::string name = trim(rest.substr(0, lparen));
-            std::string params = rest.substr(lparen + 1, rparen - lparen - 1);
-            std::string returnType = trim(rest.substr(colon + 1, brace - colon - 1));
-
-            std::vector<std::string> parts;
-            std::stringstream paramStream(params);
-            std::string param;
-            while (std::getline(paramStream, param, ','))
-            {
-                std::string p = trim(param);
-                if (!p.empty())
-                {
-                    std::size_t colonPos = p.find(':');
-                    if (colonPos != std::string::npos)
-                    {
-                        std::string paramName = trim(p.substr(0, colonPos));
-                        std::string paramType = convertTypeName(trim(p.substr(colonPos + 1)));
-                        parts.push_back(paramType + " " + paramName);
-                    }
-                }
-            }
-
-            std::string paramList = parts.empty() ? "void" : parts[0];
-            for (std::size_t i = 1; i < parts.size(); ++i)
-            {
-                paramList += ", " + parts[i];
-            }
-
-            return convertTypeName(returnType) + " " + name + "(" + paramList + ") {";
-        }
-
-        if (input.find("let ") == 0 || input.find("mut ") == 0 || input.find("const ") == 0)
-        {
-            std::string rest = trim(input.substr(input.find(' ') + 1));
-            std::size_t colonPos = rest.find(':');
-            std::size_t eqPos = rest.find('=');
-            std::string name = trim(rest.substr(0, colonPos));
-            std::string type = convertTypeName(trim(rest.substr(colonPos + 1, eqPos - colonPos - 1)));
-            std::string value = stripTrailingSemicolon(trim(rest.substr(eqPos + 1)));
-            return type + " " + name + " = " + value + ";";
-        }
-
-        if (input.find("if ") == 0)
-        {
-            std::string rest = trim(input.substr(3));
-            if (!rest.empty() && rest.back() == '{')
-            {
-                rest.pop_back();
-            }
-            std::string cond = trim(rest);
-            return "if (" + cond + ") {";
-        }
-
-        if (input.find("else if ") == 0)
-        {
-            std::string rest = trim(input.substr(8));
-            if (!rest.empty() && rest.back() == '{')
-            {
-                rest.pop_back();
-            }
-            std::string cond = trim(rest);
-            return "else if (" + cond + ") {";
-        }
-
-        if (input.find("else") == 0)
-        {
-            std::string rest = trim(input.substr(4));
-            if (!rest.empty() && rest.back() == '{')
-            {
-                return "else {";
-            }
-            if (!rest.empty())
-            {
-                return "else " + rest;
-            }
-            return "else";
-        }
-
-        if (input.find("while ") == 0)
-        {
-            std::string rest = trim(input.substr(6));
-            if (!rest.empty() && rest.back() == '{')
-            {
-                rest.pop_back();
-            }
-            std::string cond = trim(rest);
-            return "while (" + cond + ") {";
-        }
-
-        if (input.find("return ") == 0)
-        {
-            std::string rest = trim(input.substr(7));
-            return "return " + rest + ";";
-        }
-
-        if (input.find("printf") == 0 || input.find("prinf") == 0)
-        {
-            std::string rest = trim(input.substr(input.find("printf") == 0 ? 6 : 5));
-            if (!rest.empty() && rest[0] == '(')
-            {
-                rest = trim(rest.substr(1, rest.size() - 2));
-            }
-            return emitPrintCall(rest, variableTypes);
-        }
-
-        if (input.find("say") == 0)
-        {
-            std::string rest = trim(input.substr(3));
-            if (!rest.empty() && rest[0] == '(')
-            {
-                rest = trim(rest.substr(1, rest.size() - 2));
-            }
-            return emitSayCall(rest, variableTypes);
-        }
-
-        if (input.find("print") == 0)
-        {
-            std::string rest = trim(input.substr(5));
-            if (!rest.empty() && rest[0] == '(')
-            {
-                rest = trim(rest.substr(1, rest.size() - 2));
-            }
-            return emitPrintCall(rest, variableTypes);
-        }
-
-        if (input.find("++") != std::string::npos || input.find("--") != std::string::npos)
-        {
-            return input + ";";
-        }
-
-        if (input.find("=") != std::string::npos)
-        {
-            return input + ";";
-        }
-
-        return input + ";";
-    }
-
-    std::map<std::string, std::string> collectVariableTypes(const std::vector<std::string> &lines)
-    {
-        std::map<std::string, std::string> types;
-        for (const std::string &rawLine : lines)
-        {
-            std::string line = trim(rawLine);
-            if (line.empty())
+            if (!node)
                 continue;
 
-            if (line.find("let ") == 0 || line.find("mut ") == 0 || line.find("const ") == 0)
+            if (auto *decl = dynamic_cast<VariableDeclaration *>(node))
             {
-                std::string rest = trim(line.substr(line.find(' ') + 1));
-                std::size_t colonPos = rest.find(':');
-                std::size_t eqPos = rest.find('=');
-                if (colonPos == std::string::npos)
-                    continue;
-                std::string name = trim(rest.substr(0, colonPos));
-                std::string type = normalizeTypeName(convertTypeName(trim(rest.substr(colonPos + 1, eqPos == std::string::npos ? rest.size() - colonPos - 1 : eqPos - colonPos - 1))));
-                types[name] = type;
+                std::string type;
+                if (!decl->declaredType.empty())
+                {
+                    type = normalizeTypeName(decl->declaredType);
+                }
+                else
+                {
+                    type = inferNodeType(decl->value, scope, functionReturnTypes);
+                }
+                scope[decl->identifier] = type;
+            }
+            else if (auto *ifStmt = dynamic_cast<IfStatement *>(node))
+            {
+                collectDeclaredLocals(ifStmt->consequent, scope, functionReturnTypes);
+                collectDeclaredLocals(ifStmt->alternate, scope, functionReturnTypes);
+            }
+            else if (auto *loop = dynamic_cast<WhileLoop *>(node))
+            {
+                collectDeclaredLocals(loop->body, scope, functionReturnTypes);
+            }
+        }
+    }
+
+    // Builds one scope: parameters first, then every local declared
+    // anywhere in the body (including inside if/while blocks -- this
+    // matches how TypeChecker itself tracks symbols, so codegen and type
+    // checking never disagree about what's in scope).
+    std::map<std::string, std::string> buildScope(const std::vector<Param> &params,
+                                                    const std::vector<Node *> &body,
+                                                    const std::map<std::string, std::string> &functionReturnTypes)
+    {
+        std::map<std::string, std::string> scope;
+        for (const Param &p : params)
+        {
+            scope[p.name] = p.type.empty() ? "int" : normalizeTypeName(p.type);
+        }
+        collectDeclaredLocals(body, scope, functionReturnTypes);
+        return scope;
+    }
+
+    // Return-type annotations are optional in Quill (only parameter
+    // types are required by the grammar). When a function omits one,
+    // infer its return type from what it actually returns -- searching
+    // inside if/while blocks too, not just the top level of the body,
+    // since a `return` is very often written inside a branch.
+    std::string inferFunctionReturnType(const std::vector<Node *> &body,
+                                         const std::map<std::string, std::string> &scope,
+                                         const std::map<std::string, std::string> &functionReturnTypes)
+    {
+        for (Node *node : body)
+        {
+            if (!node)
+                continue;
+
+            if (auto *ret = dynamic_cast<ReturnStatement *>(node))
+            {
+                if (ret->value)
+                {
+                    return inferNodeType(ret->value, scope, functionReturnTypes);
+                }
+            }
+            else if (auto *ifStmt = dynamic_cast<IfStatement *>(node))
+            {
+                std::string fromConsequent = inferFunctionReturnType(ifStmt->consequent, scope, functionReturnTypes);
+                if (fromConsequent != "void")
+                    return fromConsequent;
+                std::string fromAlternate = inferFunctionReturnType(ifStmt->alternate, scope, functionReturnTypes);
+                if (fromAlternate != "void")
+                    return fromAlternate;
+            }
+            else if (auto *loop = dynamic_cast<WhileLoop *>(node))
+            {
+                std::string fromLoop = inferFunctionReturnType(loop->body, scope, functionReturnTypes);
+                if (fromLoop != "void")
+                    return fromLoop;
+            }
+        }
+        return "void";
+    }
+
+    // Seeds the stdlib's known signatures, then resolves every
+    // user-defined function's return type: the explicit annotation if
+    // the student wrote one, otherwise inference from its `return`
+    // statements. Walking program.body in order and adding each
+    // function's type as we go (rather than computing them all
+    // independently) means a function's own return-inference can see
+    // the resolved types of every function declared before it --
+    // exactly the "must be declared before called" rule Quill already
+    // requires, so this never needs a forward reference.
+    std::map<std::string, std::string> buildFunctionReturnTypes(const Program &program)
+    {
+        std::map<std::string, std::string> types;
+        types["len"] = "int";
+        types["toString"] = "str";
+
+        for (Node *node : program.body)
+        {
+            if (auto *fn = dynamic_cast<Function *>(node))
+            {
+                if (!fn->returnType.empty())
+                {
+                    types[fn->name] = normalizeTypeName(fn->returnType);
+                }
+                else
+                {
+                    std::map<std::string, std::string> scope = buildScope(fn->params, fn->body, types);
+                    types[fn->name] = inferFunctionReturnType(fn->body, scope, types);
+                }
             }
         }
         return types;
     }
 
-    class Transpiler
+    // ------------------------------------------------------------------
+    // AST -> C codegen.
+    // ------------------------------------------------------------------
+
+    std::string astToC(Node *node,
+                        const std::map<std::string, std::string> &scope,
+                        const std::map<std::string, std::string> &functionReturnTypes);
+
+    // Renders `node` as a C expression that evaluates to a `const char*`,
+    // converting non-string values through the small runtime helpers
+    // emitted at the top of every generated file. This is what makes
+    // `"score: " + score` (int + str) work, per the language tour.
+    std::string toCStringExpr(Node *node,
+                               const std::map<std::string, std::string> &scope,
+                               const std::map<std::string, std::string> &functionReturnTypes)
     {
-    private:
-        // 1. Update the signature to accept variableTypes as a parameter
-        std::string astToC(Node *node, const std::map<std::string, std::string> &variableTypes)
-        {
-            if (!node)
-                return "";
+        std::string type = inferNodeType(node, scope, functionReturnTypes);
+        std::string code = astToC(node, scope, functionReturnTypes);
+        if (type == "str")
+            return code;
+        if (type == "float")
+            return "quill_ftoa(" + code + ")";
+        if (type == "bool")
+            return "((" + code + ") ? \"true\" : \"false\")";
+        return "quill_itoa(" + code + ")";
+    }
 
-            // Variable Declarations
-            if (auto *decl = dynamic_cast<VariableDeclaration *>(node))
-            {
-                std::string typeName = "int";
-                auto it = variableTypes.find(decl->identifier);
-                if (it != variableTypes.end())
-                {
-                    typeName = it->second;
-                }
-                std::string type = convertTypeName(typeName);
-                std::string val = decl->value ? astToC(decl->value, variableTypes) : "0";
-                return type + " " + decl->identifier + " = " + val + ";";
-            }
-
-            // Variable Assignments
-            if (auto *assign = dynamic_cast<Assignment *>(node))
-            {
-                return assign->identifier + " = " + astToC(assign->value, variableTypes) + ";";
-            }
-
-            // Binary Operations
-            if (auto *bin = dynamic_cast<BinaryExpression *>(node))
-            {
-                return "(" + astToC(bin->left, variableTypes) + " " + bin->op + " " + astToC(bin->right, variableTypes) + ")";
-            }
-
-            // FIX 1: Natively map prefix modifications like -N and !flag expressions
-            if (auto *unary = dynamic_cast<UnaryExpression *>(node))
-            {
-                return unary->op + astToC(unary->operand, variableTypes);
-            }
-
-            // Literal Terminals
-            if (auto *litInt = dynamic_cast<LiteralInt *>(node))
-                return std::to_string(litInt->value);
-            if (auto *litFloat = dynamic_cast<LiteralFloat *>(node))
-                return std::to_string(litFloat->value);
-            if (auto *litBool = dynamic_cast<LiteralBool *>(node))
-                return litBool->value ? "true" : "false";
-            if (auto *litStr = dynamic_cast<LiteralString *>(node))
-                return "\"" + litStr->value + "\"";
-            if (auto *ident = dynamic_cast<Identifier *>(node))
-                return ident->name;
-
-            // Conditionals
-            if (auto *ifStmt = dynamic_cast<IfStatement *>(node))
-            {
-                std::ostringstream block;
-                block << "if " << astToC(ifStmt->condition, variableTypes) << " {\n";
-                for (Node *stmt : ifStmt->consequent)
-                {
-                    block << "        " << astToC(stmt, variableTypes) << "\n";
-                }
-                block << "    }";
-                if (!ifStmt->alternate.empty())
-                {
-                    block << " else {\n";
-                    for (Node *stmt : ifStmt->alternate)
-                    {
-                        block << "        " << astToC(stmt, variableTypes) << "\n";
-                    }
-                    block << "    }";
-                }
-                return block.str();
-            }
-
-            // Loops
-            if (auto *loop = dynamic_cast<WhileLoop *>(node))
-            {
-                std::ostringstream block;
-                block << "while " << astToC(loop->condition, variableTypes) << " {\n";
-                for (Node *stmt : loop->body)
-                {
-                    block << "        " << astToC(stmt, variableTypes) << "\n";
-                }
-                block << "    }";
-                return block.str();
-            }
-
-            // Expressions
-            if (auto *exprStmt = dynamic_cast<ExpressionStatement *>(node))
-            {
-                std::string code = astToC(exprStmt->expression, variableTypes);
-                if (!code.empty() && code.back() != ';')
-                {
-                    code += ";";
-                }
-                return code;
-            }
-
-            // Add this case alongside your other statement type checks:
-            if (auto *ret = dynamic_cast<ReturnStatement *>(node))
-            {
-                if (ret->value)
-                {
-                    return "return " + astToC(ret->value, variableTypes) + ";";
-                }
-                return "return;";
-            }
-
-            // Function Invocation
-            if (auto *call = dynamic_cast<CallExpression *>(node))
-            {
-                std::string name = call->callee;
-                if (name == "print")
-                    name = "printf";
-
-                std::string argsList;
-                for (size_t i = 0; i < call->arguments.size(); ++i)
-                {
-                    if (i > 0)
-                        argsList += ", ";
-                    argsList += astToC(call->arguments[i], variableTypes);
-                }
-                return name + "(" + argsList + ")";
-            }
-
+    std::string astToC(Node *node,
+                        const std::map<std::string, std::string> &scope,
+                        const std::map<std::string, std::string> &functionReturnTypes)
+    {
+        if (!node)
             return "";
+
+        // Variable declarations
+        if (auto *decl = dynamic_cast<VariableDeclaration *>(node))
+        {
+            auto it = scope.find(decl->identifier);
+            std::string typeName = it != scope.end() ? it->second : "int";
+            std::string type = convertTypeName(typeName);
+            std::string val = decl->value ? astToC(decl->value, scope, functionReturnTypes) : "0";
+            return type + " " + decl->identifier + " = " + val + ";";
         }
 
+        // Assignments
+        if (auto *assign = dynamic_cast<Assignment *>(node))
+        {
+            return assign->identifier + " = " + astToC(assign->value, scope, functionReturnTypes) + ";";
+        }
+
+        // Binary operations -- '+' on anything involving a string becomes
+        // a quill_concat() call instead of an invalid C '+' on pointers.
+        if (auto *bin = dynamic_cast<BinaryExpression *>(node))
+        {
+            if (bin->op == "+")
+            {
+                std::string leftType = inferNodeType(bin->left, scope, functionReturnTypes);
+                std::string rightType = inferNodeType(bin->right, scope, functionReturnTypes);
+                if (leftType == "str" || rightType == "str")
+                {
+                    return "quill_concat(" +
+                           toCStringExpr(bin->left, scope, functionReturnTypes) + ", " +
+                           toCStringExpr(bin->right, scope, functionReturnTypes) + ")";
+                }
+            }
+            return "(" + astToC(bin->left, scope, functionReturnTypes) + " " + bin->op + " " +
+                   astToC(bin->right, scope, functionReturnTypes) + ")";
+        }
+
+        if (auto *unary = dynamic_cast<UnaryExpression *>(node))
+        {
+            return unary->op + astToC(unary->operand, scope, functionReturnTypes);
+        }
+
+        // Literals
+        if (auto *litInt = dynamic_cast<LiteralInt *>(node))
+            return std::to_string(litInt->value);
+        if (auto *litFloat = dynamic_cast<LiteralFloat *>(node))
+            return std::to_string(litFloat->value);
+        if (auto *litBool = dynamic_cast<LiteralBool *>(node))
+            return litBool->value ? "true" : "false";
+        if (auto *litStr = dynamic_cast<LiteralString *>(node))
+            return "\"" + litStr->value + "\"";
+        if (auto *ident = dynamic_cast<Identifier *>(node))
+            return ident->name;
+
+        // say / printf -- picks the right printf() format from the
+        // expression's inferred type instead of dropping the statement.
+        if (auto *print = dynamic_cast<PrintStatement *>(node))
+        {
+            std::string exprCode = astToC(print->expression, scope, functionReturnTypes);
+            std::string type = inferNodeType(print->expression, scope, functionReturnTypes);
+            if (type == "str")
+                return "printf(\"%s\\n\", " + exprCode + ");";
+            if (type == "float")
+                return "printf(\"%f\\n\", " + exprCode + ");";
+            if (type == "bool")
+                return "printf(\"%s\\n\", (" + exprCode + ") ? \"true\" : \"false\");";
+            return "printf(\"%d\\n\", " + exprCode + ");";
+        }
+
+        // i++ / i--
+        if (auto *inc = dynamic_cast<Increment *>(node))
+        {
+            return inc->identifier + "++;";
+        }
+        if (auto *dec = dynamic_cast<Decrement *>(node))
+        {
+            return dec->identifier + "--;";
+        }
+
+        // Conditionals
+        if (auto *ifStmt = dynamic_cast<IfStatement *>(node))
+        {
+            std::ostringstream block;
+            block << "if " << astToC(ifStmt->condition, scope, functionReturnTypes) << " {\n";
+            for (Node *stmt : ifStmt->consequent)
+            {
+                block << "        " << astToC(stmt, scope, functionReturnTypes) << "\n";
+            }
+            block << "    }";
+            if (!ifStmt->alternate.empty())
+            {
+                block << " else {\n";
+                for (Node *stmt : ifStmt->alternate)
+                {
+                    block << "        " << astToC(stmt, scope, functionReturnTypes) << "\n";
+                }
+                block << "    }";
+            }
+            return block.str();
+        }
+
+        // Loops
+        if (auto *loop = dynamic_cast<WhileLoop *>(node))
+        {
+            std::ostringstream block;
+            block << "while " << astToC(loop->condition, scope, functionReturnTypes) << " {\n";
+            for (Node *stmt : loop->body)
+            {
+                block << "        " << astToC(stmt, scope, functionReturnTypes) << "\n";
+            }
+            block << "    }";
+            return block.str();
+        }
+
+        // Expression statements
+        if (auto *exprStmt = dynamic_cast<ExpressionStatement *>(node))
+        {
+            std::string code = astToC(exprStmt->expression, scope, functionReturnTypes);
+            if (!code.empty() && code.back() != ';')
+            {
+                code += ";";
+            }
+            return code;
+        }
+
+        // return
+        if (auto *ret = dynamic_cast<ReturnStatement *>(node))
+        {
+            if (ret->value)
+            {
+                return "return " + astToC(ret->value, scope, functionReturnTypes) + ";";
+            }
+            return "return;";
+        }
+
+        // Function calls, including the small stdlib (len, toString).
+        // Adding a new stdlib function later means adding one branch
+        // here (and its return type in buildFunctionReturnTypes above)
+        // -- not touching anything else in the transpiler.
+        if (auto *call = dynamic_cast<CallExpression *>(node))
+        {
+            std::string name = call->callee;
+
+            std::vector<std::string> argCodes;
+            std::vector<std::string> argTypes;
+            for (Node *arg : call->arguments)
+            {
+                argCodes.push_back(astToC(arg, scope, functionReturnTypes));
+                argTypes.push_back(inferNodeType(arg, scope, functionReturnTypes));
+            }
+
+            if (name == "print")
+            {
+                name = "printf";
+            }
+            else if (name == "len" && argCodes.size() == 1)
+            {
+                return "(int)strlen(" + argCodes[0] + ")";
+            }
+            else if (name == "toString" && argCodes.size() == 1)
+            {
+                if (argTypes[0] == "str")
+                    return argCodes[0];
+                if (argTypes[0] == "float")
+                    return "quill_ftoa(" + argCodes[0] + ")";
+                if (argTypes[0] == "bool")
+                    return "((" + argCodes[0] + ") ? \"true\" : \"false\")";
+                return "quill_itoa(" + argCodes[0] + ")";
+            }
+
+            std::string argsList;
+            for (std::size_t i = 0; i < argCodes.size(); ++i)
+            {
+                if (i > 0)
+                    argsList += ", ";
+                argsList += argCodes[i];
+            }
+            return name + "(" + argsList + ")";
+        }
+
+        return "";
+    }
+
+    class Transpiler
+    {
     public:
         std::string transpile(const std::string &source)
         {
@@ -1223,8 +863,8 @@ namespace
             Parser parser(tokens);
             Program program = parser.parse();
 
-            std::vector<std::string> rawLines = splitLines(stripComments(source));
-            std::map<std::string, std::string> variableTypes = collectVariableTypes(rawLines);
+            std::map<std::string, std::string> functionReturnTypes = buildFunctionReturnTypes(program);
+            std::map<std::string, std::string> mainScope = buildScope({}, program.body, functionReturnTypes);
 
             std::vector<std::string> functionBlocks;
             std::vector<std::string> mainLines;
@@ -1236,51 +876,49 @@ namespace
 
                 if (auto *fnNode = dynamic_cast<Function *>(node))
                 {
-                    std::ostringstream funcStream;
+                    std::map<std::string, std::string> scope =
+                        buildScope(fnNode->params, fnNode->body, functionReturnTypes);
 
-                    // 1. Dynamically infer return type based on function body contents
-                    std::string returnType = "void";
-                    for (Node *bodyStmt : fnNode->body)
-                    {
-                        if (auto *ret = dynamic_cast<ReturnStatement *>(bodyStmt))
-                        {
-                            if (ret->value)
-                            {
-                                // Infer the type based on the expression string or symbol table map
-                                std::string exprCode = astToC(ret->value, variableTypes);
-                                returnType = convertTypeName(inferExpressionType(exprCode, variableTypes));
-                            }
-                        }
-                    }
+                    // Return type: already resolved once in
+                    // buildFunctionReturnTypes -- the explicit annotation
+                    // if the student wrote one, otherwise inferred from
+                    // the function's own `return` statements. Reusing
+                    // that single resolution (instead of recomputing it
+                    // here) guarantees this signature always matches what
+                    // call sites elsewhere assume the function returns.
+                    std::string returnType = convertTypeName(functionReturnTypes.at(fnNode->name));
 
-                    // 2. Build the parameter list dynamically
-                    std::string params = "";
-                    if (fnNode->name == "Pow")
+                    // Parameter list: built from fnNode->params for
+                    // every function, not just one named "Pow".
+                    std::string params;
+                    for (std::size_t i = 0; i < fnNode->params.size(); ++i)
                     {
-                        params = "int n, double x";
+                        if (i > 0)
+                            params += ", ";
+                        params += convertTypeName(normalizeTypeName(fnNode->params[i].type)) +
+                                  " " + fnNode->params[i].name;
                     }
-                    else
-                    {
+                    if (params.empty())
                         params = "void";
-                    }
 
-                    // Emit signature with its true evaluated return type
+                    std::ostringstream funcStream;
                     funcStream << returnType << " " << fnNode->name << "(" << params << ") {\n";
                     for (Node *bodyStmt : fnNode->body)
                     {
-                        funcStream << "    " << astToC(bodyStmt, variableTypes) << "\n";
+                        std::string stmtCode = astToC(bodyStmt, scope, functionReturnTypes);
+                        if (!stmtCode.empty())
+                        {
+                            funcStream << "    " << stmtCode << "\n";
+                        }
                     }
                     funcStream << "}\n";
                     functionBlocks.push_back(funcStream.str());
                 }
-
-                // Update your main loop routing inside Transpiler::transpile to verify terminal tokens
                 else
                 {
-                    std::string lineCode = astToC(node, variableTypes);
+                    std::string lineCode = astToC(node, mainScope, functionReturnTypes);
                     if (!lineCode.empty())
                     {
-                        // FIX 2: Ensure individual expressions get isolated via trailing semicolons inside main
                         if (lineCode.back() != ';' && lineCode.back() != '}')
                         {
                             lineCode += ";";
@@ -1290,10 +928,12 @@ namespace
                 }
             }
 
-            // ... rest of your header/stream generation boilerplate remains the exact same ...
             std::ostringstream out;
             out << "#include <stdio.h>\n#include <stdbool.h>\n#include <stdint.h>\n#include <string.h>\n#include <stdlib.h>\n\n";
             out << "static char* quill_concat(const char* a, const char* b) {\n    size_t lenA = a ? strlen(a) : 0;\n    size_t lenB = b ? strlen(b) : 0;\n    char* result = (char*)malloc(lenA + lenB + 1);\n    if (!result) { return NULL; }\n    if (lenA > 0) memcpy(result, a, lenA);\n    if (lenB > 0) memcpy(result + lenA, b, lenB);\n    result[lenA + lenB] = '\\0';\n    return result;\n}\n\n";
+            out << "static char* quill_dup(const char* s) {\n    size_t len = strlen(s);\n    char* out = (char*)malloc(len + 1);\n    if (!out) { return NULL; }\n    memcpy(out, s, len + 1);\n    return out;\n}\n\n";
+            out << "static char* quill_itoa(long long v) {\n    char buffer[32];\n    snprintf(buffer, sizeof(buffer), \"%lld\", v);\n    return quill_dup(buffer);\n}\n\n";
+            out << "static char* quill_ftoa(double v) {\n    char buffer[64];\n    snprintf(buffer, sizeof(buffer), \"%f\", v);\n    return quill_dup(buffer);\n}\n\n";
 
             for (const std::string &fn : functionBlocks)
                 out << fn << "\n";
