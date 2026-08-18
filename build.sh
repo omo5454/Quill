@@ -6,7 +6,7 @@ TARGET="linux"
 CLEAN=false
 
 BIN_DIR="bin"
-VERSION="1.3.1"
+VERSION="2.1.0"
 
 print_header() {
     echo
@@ -29,7 +29,17 @@ build_cpp_binary() {
     local label="$3"
 
     echo "Building $label..."
-    g++ -std=c++17 "$src" -O2 -o "$BIN_DIR/$out"
+    if [[target == "linux" ]]; then
+        g++ -std=c++17 "$src" -O2 -o "$BIN_DIR/$out"
+    else
+        g++ -std=c++17 "$src" -O2 -o "$BIN_DIR/quill-linux"
+        x86_64-w64-mingw32-g++ -static -static-libgcc -static-libstdc++ "$src" -O2 -o "$BIN_DIR/quill-windows64.exe"
+        i686-w64-mingw32-g++ -static -static-libgcc -static-libstdc++ "$src" -O2 -o "$BIN_DIR/quill-windows32.exe"
+        arm64-apple-darwin23-clang++ "$src" -o "$BIN_DIR/quill-mac-arm64"
+        x86_64-apple-darwin23-clang++ "$src" -o "$BIN_DIR/quill-mac-intel"
+
+
+    fi
     if [ $? -ne 0 ]; then
         print_fail "Failed to build $label"
         return 1
@@ -71,12 +81,10 @@ print_header "Quill C++ Build v$VERSION"
 
 case "${TARGET,,}" in
     linux)
-        build_cpp_binary "src/core/transpiler/trans.cpp" "quill" "transpiler" || exit 1
-        build_cpp_binary "src/core/interpreter/interpreter.cpp" "quill-c" "interpreter" || exit 1
+        build_cpp_binary "src/core/transpiler/trans.cpp" "quill-linux" "transpiler" || exit 1
         ;;
     all)
-        build_cpp_binary "src/core/transpiler/trans.cpp" "quill" "transpiler" || exit 1
-        build_cpp_binary "src/core/interpreter/interpreter.cpp" "quill-c" "interpreter" || exit 1
+        build_cpp_binary "src/core/transpiler/trans.cpp" "quill-linux" "transpiler" || exit 1
         ;;
     *)
         print_fail "Unsupported target: $TARGET"

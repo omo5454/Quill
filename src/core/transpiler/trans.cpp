@@ -113,301 +113,6 @@ namespace
         }
     }
 
-    class Interpreter
-    {
-    public:
-        RuntimeValue run(const Program &program)
-        {
-            RuntimeValue result;
-            for (Node *stmt : program.body)
-            {
-                if (stmt)
-                {
-                    RuntimeValue v = evalStatement(stmt);
-                    if (v.type != RuntimeType::Null)
-                    {
-                        result = v;
-                    }
-                }
-            }
-            return result;
-        }
-
-    private:
-        std::unordered_map<std::string, RuntimeValue> env_;
-
-        RuntimeValue evalStatement(Node *node)
-        {
-            if (!node)
-                return RuntimeValue{};
-
-            if (auto *decl = dynamic_cast<VariableDeclaration *>(node))
-            {
-                RuntimeValue value = decl->value ? evalNode(decl->value) : RuntimeValue{};
-                env_[decl->identifier] = value;
-                return RuntimeValue{};
-            }
-
-            if (auto *assign = dynamic_cast<Assignment *>(node))
-            {
-                auto it = env_.find(assign->identifier);
-                if (it == env_.end())
-                {
-                    throw std::runtime_error("undefined identifier: " + assign->identifier);
-                }
-                it->second = evalNode(assign->value);
-                return RuntimeValue{};
-            }
-
-            if (auto *print = dynamic_cast<PrintStatement *>(node))
-            {
-                RuntimeValue value = evalNode(print->expression);
-                std::cout << stringifyValue(value) << std::endl;
-                return RuntimeValue{};
-            }
-
-            if (auto *ifStmt = dynamic_cast<IfStatement *>(node))
-            {
-                RuntimeValue cond = evalNode(ifStmt->condition);
-                bool ok = cond.type == RuntimeType::Bool ? cond.asBool : cond.asInt != 0;
-                if (ok)
-                {
-                    for (Node *stmt : ifStmt->consequent)
-                    {
-                        evalStatement(stmt);
-                    }
-                }
-                else
-                {
-                    for (Node *stmt : ifStmt->alternate)
-                    {
-                        evalStatement(stmt);
-                    }
-                }
-                return RuntimeValue{};
-            }
-
-            if (auto *loop = dynamic_cast<WhileLoop *>(node))
-            {
-                while (true)
-                {
-                    RuntimeValue cond = evalNode(loop->condition);
-                    bool ok = cond.type == RuntimeType::Bool ? cond.asBool : cond.asInt != 0;
-                    if (!ok)
-                        break;
-                    for (Node *stmt : loop->body)
-                    {
-                        evalStatement(stmt);
-                    }
-                }
-                return RuntimeValue{};
-            }
-
-            if (auto *expr = dynamic_cast<ExpressionStatement *>(node))
-            {
-                return evalNode(expr->expression);
-            }
-
-            if (auto *ret = dynamic_cast<ReturnStatement *>(node))
-            {
-                return ret->value ? evalNode(ret->value) : RuntimeValue{};
-            }
-
-            if (auto *fn = dynamic_cast<Function *>(node))
-            {
-                (void)fn;
-                return RuntimeValue{};
-            }
-
-            if (auto *inc = dynamic_cast<Increment *>(node))
-            {
-                auto it = env_.find(inc->identifier);
-                if (it == env_.end())
-                {
-                    throw std::runtime_error("undefined identifier: " + inc->identifier);
-                }
-                if (it->second.type == RuntimeType::Float)
-                {
-                    it->second.asFloat += 1.0;
-                }
-                else
-                {
-                    it->second.asInt += 1;
-                }
-                return RuntimeValue{};
-            }
-
-            if (auto *dec = dynamic_cast<Decrement *>(node))
-            {
-                auto it = env_.find(dec->identifier);
-                if (it == env_.end())
-                {
-                    throw std::runtime_error("undefined identifier: " + dec->identifier);
-                }
-                if (it->second.type == RuntimeType::Float)
-                {
-                    it->second.asFloat -= 1.0;
-                }
-                else
-                {
-                    it->second.asInt -= 1;
-                }
-                return RuntimeValue{};
-            }
-
-            return RuntimeValue{};
-        }
-
-        RuntimeValue evalNode(Node *node)
-        {
-            if (!node)
-                return RuntimeValue{};
-
-            if (auto *lit = dynamic_cast<LiteralInt *>(node))
-            {
-                return makeInt(lit->value);
-            }
-            if (auto *lit = dynamic_cast<LiteralFloat *>(node))
-            {
-                return makeFloat(lit->value);
-            }
-            if (auto *lit = dynamic_cast<LiteralString *>(node))
-            {
-                return makeString(lit->value);
-            }
-            if (auto *lit = dynamic_cast<LiteralBool *>(node))
-            {
-                return makeBool(lit->value);
-            }
-            if (auto *ident = dynamic_cast<Identifier *>(node))
-            {
-                auto it = env_.find(ident->name);
-                if (it == env_.end())
-                {
-                    throw std::runtime_error("undefined identifier: " + ident->name);
-                }
-                return it->second;
-            }
-            if (auto *bin = dynamic_cast<BinaryExpression *>(node))
-            {
-                RuntimeValue left = evalNode(bin->left);
-                RuntimeValue right = evalNode(bin->right);
-
-                if (bin->op == "+")
-                {
-                    if (left.type == RuntimeType::String || right.type == RuntimeType::String)
-                    {
-                        return makeString(stringifyValue(left) + stringifyValue(right));
-                    }
-                    if (left.type == RuntimeType::Float || right.type == RuntimeType::Float)
-                    {
-                        return makeFloat((left.type == RuntimeType::Float ? left.asFloat : left.asInt) + (right.type == RuntimeType::Float ? right.asFloat : right.asInt));
-                    }
-                    return makeInt(left.asInt + right.asInt);
-                }
-                if (bin->op == "-")
-                {
-                    if (left.type == RuntimeType::Float || right.type == RuntimeType::Float)
-                    {
-                        return makeFloat((left.type == RuntimeType::Float ? left.asFloat : left.asInt) - (right.type == RuntimeType::Float ? right.asFloat : right.asInt));
-                    }
-                    return makeInt(left.asInt - right.asInt);
-                }
-                if (bin->op == "*")
-                {
-                    if (left.type == RuntimeType::Float || right.type == RuntimeType::Float)
-                    {
-                        return makeFloat((left.type == RuntimeType::Float ? left.asFloat : left.asInt) * (right.type == RuntimeType::Float ? right.asFloat : right.asInt));
-                    }
-                    return makeInt(left.asInt * right.asInt);
-                }
-                if (bin->op == "/")
-                {
-                    if (left.type == RuntimeType::Float || right.type == RuntimeType::Float)
-                    {
-                        return makeFloat((left.type == RuntimeType::Float ? left.asFloat : left.asInt) / (right.type == RuntimeType::Float ? right.asFloat : right.asInt));
-                    }
-                    return makeInt(left.asInt / right.asInt);
-                }
-                if (bin->op == "==")
-                {
-                    if (left.type == RuntimeType::String && right.type == RuntimeType::String)
-                    {
-                        return makeBool(left.asString == right.asString);
-                    }
-                    return makeBool((left.type == RuntimeType::Float || right.type == RuntimeType::Float ? (left.type == RuntimeType::Float ? left.asFloat : left.asInt) : left.asInt) ==
-                                    (right.type == RuntimeType::Float || left.type == RuntimeType::Float ? (right.type == RuntimeType::Float ? right.asFloat : right.asInt) : right.asInt));
-                }
-                if (bin->op == "<")
-                {
-                    if (left.type == RuntimeType::String && right.type == RuntimeType::String)
-                    {
-                        return makeBool(left.asString < right.asString);
-                    }
-                    return makeBool((left.type == RuntimeType::Float ? left.asFloat : left.asInt) < (right.type == RuntimeType::Float ? right.asFloat : right.asInt));
-                }
-                if (bin->op == ">")
-                {
-                    if (left.type == RuntimeType::String && right.type == RuntimeType::String)
-                    {
-                        return makeBool(left.asString > right.asString);
-                    }
-                    return makeBool((left.type == RuntimeType::Float ? left.asFloat : left.asInt) > (right.type == RuntimeType::Float ? right.asFloat : right.asInt));
-                }
-                if (bin->op == "<=")
-                {
-                    if (left.type == RuntimeType::String && right.type == RuntimeType::String)
-                    {
-                        return makeBool(left.asString <= right.asString);
-                    }
-                    return makeBool((left.type == RuntimeType::Float ? left.asFloat : left.asInt) <= (right.type == RuntimeType::Float ? right.asFloat : right.asInt));
-                }
-                if (bin->op == ">=")
-                {
-                    if (left.type == RuntimeType::String && right.type == RuntimeType::String)
-                    {
-                        return makeBool(left.asString >= right.asString);
-                    }
-                    return makeBool((left.type == RuntimeType::Float ? left.asFloat : left.asInt) >= (right.type == RuntimeType::Float ? right.asFloat : right.asInt));
-                }
-                return RuntimeValue{};
-            }
-
-            if (auto *unary = dynamic_cast<UnaryExpression *>(node))
-            {
-                RuntimeValue value = evalNode(unary->operand);
-                if (unary->op == "-")
-                {
-                    if (value.type == RuntimeType::Float)
-                    {
-                        return makeFloat(-value.asFloat);
-                    }
-                    return makeInt(-value.asInt);
-                }
-                if (unary->op == "!")
-                {
-                    return makeBool(!(value.type == RuntimeType::Bool ? value.asBool : value.asInt != 0));
-                }
-                return RuntimeValue{};
-            }
-
-            if (auto *call = dynamic_cast<CallExpression *>(node))
-            {
-                if (call->callee == "print" || call->callee == "printf")
-                {
-                    for (Node *arg : call->arguments)
-                    {
-                        RuntimeValue v = evalNode(arg);
-                        std::cout << stringifyValue(v) << std::endl;
-                    }
-                    return RuntimeValue{};
-                }
-                return RuntimeValue{};
-            }
-
-            return RuntimeValue{};
-        }
-    };
     // Maps any spelling of a Quill/C type name to Quill's own canonical
     // name ("int", "float", "str", "bool", "void"). Unknown/future type
     // names fall back to "int" so a typo doesn't crash the transpiler --
@@ -961,7 +666,6 @@ int main(int argc, char **argv)
 {
     bool debug = false;
     bool version = false;
-    bool interpret = false;
     bool transpileMode = false;
     bool compileC = false;
     std::string outputPath;
@@ -977,10 +681,6 @@ int main(int argc, char **argv)
         else if (arg == "--version" || arg == "-v")
         {
             version = true;
-        }
-        else if (arg == "--interpret")
-        {
-            interpret = true;
         }
         else if (arg == "--transpile")
         {
@@ -1007,17 +707,17 @@ int main(int argc, char **argv)
 
     if (version)
     {
-        std::cout << "Quill version: 1.3.1\n";
+        std::cout << "Quill version: 2.1.0\n";
         return 0;
     }
 
     if (args.size() != 1)
     {
-        std::cerr << "Usage: quill [--transpile|--interpret] [--compile] [-o output] <input.qsc>\n";
+        std::cerr << "Usage: quill [--transpile] [--compile] [-o output] <input.qsc>\n";
         return 1;
     }
 
-    if (!interpret && !transpileMode)
+    if (!transpileMode)
     {
         transpileMode = true;
     }
@@ -1066,25 +766,6 @@ int main(int argc, char **argv)
     {
         std::cerr << "Type error: " << ex.what() << "\n";
         return 1;
-    }
-
-    if (interpret)
-    {
-        try
-        {
-            Interpreter interpreter;
-            interpreter.run(program);
-            if (debug)
-            {
-                std::cout << "=== INTERPRETED ===\n";
-            }
-            return 0;
-        }
-        catch (const std::exception &ex)
-        {
-            std::cerr << "Interpreter error: " << ex.what() << "\n";
-            return 1;
-        }
     }
 
     Transpiler transpiler;

@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.iss
+xcbuild
 
 info.txt
 dev.quill

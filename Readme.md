@@ -1,45 +1,43 @@
 # Quill
-
-Quill is a statically typed, bytecode-compiled/transpiled scripting language designed for clarity, speed, and shareable function modules. It runs on a purpose-built Interpreter written in C++.
-
 ---
 
 ## Why Quill?
 
-- **Statically typed** — type errors are caught at compile time, not runtime
-- **Fast** — Interpreter written in C++, ~3x faster than the original interpreter (Transpiler makes code as fast as C)
-- **Simple syntax** — clean, readable, no unnecessary complexity
-- **Module-first** — designed around writing and sharing focused function libraries
-- **Cross-platform** — runs on Windows, Linux, and macOS
+- **Statically Typed** — Type errors are caught early at compile time before execution.
+- **Blazing Fast** — Powered by a C++ transpilation pipeline (giving you near-native performance).
+- **Simple & Clean Syntax** — Readable syntax with optional semicolons and zero clutter.
+- **Module-First** — Built around writing, sharing, and importing function libraries directly from GitHub.
+- **Cross-Platform** — Native executable support for **Linux** and **Windows**.
 
 ---
 
 ## Installation
 
-Download the latest release for your platform from the [releases page](../../releases).
+Download the pre-compiled binary for your platform from the [Releases](https://github.com/omrimorgan5-hub/Quill/releases) page.
 
 ### Windows
-Run `QuillInstaller.exe` — optionally adds `quill` and `quill-c` to your PATH during install.
+Install the quill-windows[32 or 64].exe and run it in powershell.
 
-### Linux / macOS
+### Linux
+Make the binary executable and run:
 ```bash
-chmod +x quill
-./quill myfile.qsc
+chmod +x quill-linux
+./quill-linux myfile.qsc
+
 ```
+
+> **Note on macOS:** Support for macOS is currently paused to ensure maximum stability on core Linux and Windows platforms.
 
 ---
 
 ## Usage
 
 ```bash
-# run a source file directly
-quill-c myfile.qsc
+# Transpiling to C++ and compiling to a native binary
+quill-[os] --compile myfile.qsc
 
-# Or use quill --interpret
-quill --interpret myfile.qsc
-
-# Or transpile to C and auto compile
-quill --compile myfile.qsc
+# Using the standalone transpiler CLI tool directly
+quill-[os] myfile.qsc -o output.c
 ```
 
 ---
@@ -48,46 +46,40 @@ quill --compile myfile.qsc
 
 ### Variables
 
-Variables are declared with `let` (immutable) or `mut` (mutable). Type annotations are supported.
+Variables are declared with `let`. Type annotations are supported.
 
 ```quill
 let x: int = 5;
 let name: str = "Alice";
 let pi: float = 3.14;
 let active: bool = true;
-mut counter: int = 0;
+let counter: int = 0;
+
 ```
-
-Semicolons are optional but recommended.
-
----
 
 ### Printing
 
 ```quill
 say "Hello, world!";
 printf("Hello " + name);
+
 ```
 
-String concatenation uses `+`. Any type can be concatenated with a string.
-
----
-
-### Arithmetic
+### Arithmetic & Incrementing
 
 ```quill
 let sum = 10 + 5;
-let diff = 10 - 3;
 let product = 6 * 7;
-let quotient = 20 / 4;
-let remainder = 7 % 3;
+
+let i: int = 0;
+i++;   # increment
+i--;   # decrement
+
 ```
 
----
+### Control Flow
 
-### Conditionals
-
-No parentheses required around conditions.
+Conditions do not require parentheses.
 
 ```quill
 let score: int = 75;
@@ -96,32 +88,21 @@ if score >= 90 {
     say "Grade: A";
 } else if score >= 75 {
     say "Grade: B";
-} else if score >= 60 {
-    say "Grade: C";
 } else {
     say "Grade: F";
 }
-```
 
-Supported operators: `>` `<` `>=` `<=` `==` `!=` `&&` `||` `!`
-
----
-
-### Loops
-
-```quill
-let i: int = 0;
-while i < 10 {
-    printf("i: " + i);
-    i++;
+let x: int = 0;
+while x < 5 {
+    printf("x: " + x);
+    x++;
 }
-```
 
----
+```
 
 ### Functions
 
-Functions must be declared before they are called. Type annotations on parameters and return type are supported.
+Functions must be declared before they are called.
 
 ```quill
 func add(a: int, b: int): int {
@@ -134,122 +115,39 @@ func greet(name: str): str {
 
 let result: int = add(3, 4);
 say greet("Alice");
-```
 
----
-
-### Incrementation
-
-```quill
-let i: int = 0;
-i++;   # increment
-i--;   # decrement
-```
-
----
-
-### Comments
-
-```quill
-# this is a comment
-let x: int = 5; # inline comment
 ```
 
 ---
 
 ## Type System
 
-Quill is statically typed. The type checker runs before bytecode compilation and reports all errors before execution.
+Quill runs static type checking before generating bytecode or C++ output.
 
 | Type | Example |
-|------|---------|
+| --- | --- |
 | `int` | `42` |
 | `float` | `3.14` |
 | `str` | `"hello"` |
 | `bool` | `true` / `false` |
-| `void` | functions with no return value |
-
-### Type errors caught at compile time
-
-```quill
-let x: int = "hello";
-# TypeError: cannot assign str to int — 'x'
-
-func add(a: int, b: int): int { return a + b; }
-add(1, "two");
-# TypeError: argument 2 of 'add' expects int but got str
-```
-
----
-
-## Standard Library
-
-| Function | Description | Returns |
-|----------|-------------|---------|
-| `len(s)` | Length of a string or array | `int` |
-| `toString(x)` | Convert any value to string | `str` |
-
-More stdlib functions coming in future releases.
-
----
-
-## Bytecode Format
-
-Quill source files use the `.qsc` extension. Compiled bytecode files use `.qbc`.
-
-```bash
-quill --compile myfile.qsc                   # transpile and compile
-quill --interpret myfile.qsc                 # run sourcecode directly
-```
-
----
-
-## Quick Reference
-
-| Feature | Syntax |
-|---------|--------|
-| Immutable variable | `let x: int = 5;` |
-| Mutable variable | `mut x: int = 5;` |
-| Print literal | `say "text";` |
-| Print expression | `printf("text" + var);` |
-| If | `if condition { }` |
-| Else if | `else if condition { }` |
-| Else | `else { }` |
-| While loop | `while condition { }` |
-| Function def | `func name(a: type): returnType { }` |
-| Function call | `name(arg);` |
-| Increment | `i++;` |
-| Decrement | `i--;` |
-| Comment | `# text` |
-| Compile | `quill-c file.qsc file.qbc` |
-| Run source | `quill file.qsc` |
-| Run bytecode | `quill file.qbc` |
-
----
-
-## Versioning
-Current version: **1.3.4**
+| `void` | Functions with no return value |
 
 ---
 
 ## Building from Source
 
-Requires C++ 17+.
-### Windows
+Requires **C++17** or higher.
+
+### Windows (PowerShell)
+Currently has no helper file due to complexity.
+
+### Linux
+
 ```bash
-git clone https://github.com/omrimorgan5-hub/Quill.git
+git clone [https://github.com/omrimorgan5-hub/Quill.git](https://github.com/omrimorgan5-hub/Quill.git)
 cd Quill
-./build.ps1              # Windows — builds quill.exe and quill-c.exe
-./build.ps1 -Target all  # all platforms
-./build.ps1 -Clean       # remove bin/
-```
-### Linux and macOS
-```bash
-git clone https://github.com/omrimorgan5-hub/Quill.git
-cd Quill
-./build.sh               # Linux — builds quill-linux and quill-c-linux (can and should be renamed on your system for use)
-./build.sh -t all        # all platforms
-./build.sh -c            # remove bin/
+./build.sh
+
 ```
 
 ---
@@ -258,39 +156,33 @@ cd Quill
 
 ```
 Quill/
-├── cmd/
-│   ├── quill/                 # quill AIO entry point
-│   └── quill-c/               # quill-c Interpreter entry point
 ├── src/
 │   └── core/
 │       ├── ast/               # AST node definitions
-│       ├── interpreter/       # bytecode format and serialization
-│       ├── lexer/             # tokenizer
-│       ├── parser/            # AST builder
-│       ├── transpiler/        # Quill to C transpiler
-│       ├── typechecker/       # static type checking
-│       └── types/             # token types
-├── bin/                       # compiled binaries (hidden to the repo)
-├── tests/                     # .qsc test files
-├── build.ps1                  # build script
-├── build.sh                   # build script for linux or macOS
-└── README.md                  # you're reading it
+│       ├── lexer/             # Tokenizer
+│       ├── parser/            # AST parser
+│       ├── transpiler/        # Quill -> C Transpiler also acts as main CLI entrypoint
+│       └── typechecker/       # Static type checker
+├── bin/                       # Output directory for compiled binaries
+├── build.sh                   # Linux build script
+└── README.md
+
 ```
 
 ---
 
 ## Roadmap
 
-- [ ] Hashmaps / objects
-- [ ] String methods (`split`, `trim`, `replace`, `toUpper`, `toLower`)
-- [ ] Arrays (in progress)
-- [ ] Error handling (`try` / `catch`)
-- [ ] File I/O
-- [x] Module / import system
-- [x] Package registry(uses github repos)
+* [ ] Arrays and slice operations
+* [ ] Hashmaps / Objects
+* [ ] Extended String utilities (`split`, `trim`, `replace`)
+* [ ] Native File I/O
+* [ ] Structured Error Handling (`try` / `catch`)
+* [x] Package registry (GitHub repo integration)
+* [x] C++ Transpiler pipeline backend rewrite
 
 ---
 
 ## License
 
-MIT
+Distributed under the **MIT License**.
