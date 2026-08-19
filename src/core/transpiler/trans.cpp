@@ -39,7 +39,7 @@ namespace
         if (typeName == "float")
             return "double";
         if (typeName == "str")
-            return "char*";
+            return "const char*";
         if (typeName == "bool")
             return "bool";
         if (typeName == "void")
@@ -415,7 +415,7 @@ namespace
     std::string normalizeTypeName(const std::string &typeName)
     {
         std::string type = trim(typeName);
-        if (type == "str" || type == "char*")
+        if (type == "str" || type == "const char*")
             return "str";
         if (type == "float" || type == "double")
             return "float";
