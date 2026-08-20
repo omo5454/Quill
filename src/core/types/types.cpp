@@ -5,8 +5,8 @@
 enum class TokenType {
     Identifier,
     Number,
-    Float,
-    Str,
+    Double,
+    String,
     FString,
     Keyword,
     Operator,

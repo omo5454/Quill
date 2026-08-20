@@ -28,6 +28,7 @@ quill-c-linux
 quill-c-macos-intel
 quill-c-macos-arm
 hidden*
+*.vsix
 
 # Test artifacts
 *.tmp

@@ -79,7 +79,7 @@ struct LiteralInt : Node {
     long long value = 0;
 };
 
-struct LiteralFloat : Node {
+struct LiteralDoudle : Node {
     double value = 0.0;
 };
 
@@ -94,6 +94,12 @@ struct LiteralBool : Node {
 struct IndexExpression : Node {
     Node* object = nullptr;
     Node* index = nullptr;
+};
+
+struct IndexAssignment : Node {
+    Node* object = nullptr;
+    Node* index = nullptr;
+    Node* value = nullptr;
 };
 
 struct Assignment : Node {

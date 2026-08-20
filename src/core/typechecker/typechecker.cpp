@@ -96,8 +96,28 @@ private:
             checkNode(idx->object);
             checkNode(idx->index);
             std::string objType = inferType(idx->object);
-            if (objType != "str") {
-                throw std::runtime_error("indexing with [] is only supported on str values");
+            bool isArray = objType.find('[') != std::string::npos;
+            if (objType != "string" && !isArray) {
+                throw std::runtime_error("indexing with [] is only supported on string or array values");
+            }
+            return;
+        }
+
+        if (auto* idxAssign = dynamic_cast<IndexAssignment*>(node)) {
+            checkNode(idxAssign->object);
+            checkNode(idxAssign->index);
+            checkNode(idxAssign->value);
+
+            std::string objType = inferType(idxAssign->object);
+            auto bracketPos = objType.find('[');
+            if (bracketPos == std::string::npos) {
+                throw std::runtime_error("assignment with [] is only supported on array values");
+            }
+
+            std::string elemType = objType.substr(0, bracketPos);
+            std::string valueType = inferType(idxAssign->value);
+            if (valueType != elemType) {
+                throw std::runtime_error("type mismatch assigning into array");
             }
             return;
         }
@@ -111,7 +131,15 @@ private:
     }
 
     void checkVariableDeclaration(VariableDeclaration* decl) {
-        if (!decl->value) return;
+        if (!decl->value) {
+            // Arrays (and any other declaration without an initializer)
+            // still need to be registered so later uses aren't flagged
+            // as undefined identifiers.
+            if (!decl->declaredType.empty()) {
+                symbols[decl->identifier] = decl->declaredType;
+            }
+            return;
+        }
         checkNode(decl->value);
 
         std::string valueType = inferType(decl->value);
@@ -139,9 +167,9 @@ private:
     std::string inferType(Node* node) {
         if (!node) return "void";
 
-        if (dynamic_cast<LiteralInt*>(node)) return "int";
-        if (dynamic_cast<LiteralFloat*>(node)) return "float";
-        if (dynamic_cast<LiteralString*>(node)) return "str";
+        if (dynamic_cast<LiteralInt*>(node)) return "number";
+        if (dynamic_cast<LiteralDoudle*>(node)) return "double";
+        if (dynamic_cast<LiteralString*>(node)) return "string";
         if (dynamic_cast<LiteralBool*>(node)) return "bool";
 
         if (auto* ident = dynamic_cast<Identifier*>(node)) {
@@ -152,13 +180,13 @@ private:
 
         // Indexing a str with [] yields a character, represented the
         // same way C represents char: as a small int.
-        if (dynamic_cast<IndexExpression*>(node)) return "int";
+        if (dynamic_cast<IndexExpression*>(node)) return "number";
 
         if (auto* binary = dynamic_cast<BinaryExpression*>(node)) {
             std::string left = inferType(binary->left);
             std::string right = inferType(binary->right);
             if (left == right) return left;
-            if ((left == "int" && right == "float") || (left == "float" && right == "int")) return "float";
+            if ((left == "number" && right == "double") || (left == "double" && right == "number")) return "double";
             return "unknown";
         }
 

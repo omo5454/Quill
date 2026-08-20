@@ -67,6 +67,20 @@ private:
 
     Node *parseStatement()
     {
+        // Comments were only ever skipped by the top-level parse() loop,
+        // so one written inside a function/if/while body would fall
+        // through every check below and hit the catch-all -- which
+        // consumes the comment's own token, not the comment, and hands
+        // back an empty Identifier as if it were real code. Skipping
+        // here instead means every nested body-parsing loop (which all
+        // call parseStatement in a loop and already handle a null
+        // return the same way ';' is handled) gets this for free.
+        if (peek().type == TokenType::Comment)
+        {
+            advance();
+            return nullptr;
+        }
+
         if (peek().value == ";")
         {
             advance();
@@ -108,7 +122,7 @@ private:
             return parseIdentifierStatement();
         }
 
-        if (peek().type == TokenType::Number || peek().type == TokenType::Float || peek().type == TokenType::Str)
+        if (peek().type == TokenType::Number || peek().type == TokenType::Double || peek().type == TokenType::String)
         {
             return parseLiteralStatement();
         }
@@ -133,14 +147,31 @@ private:
         {
             advance();
             type = advance().value;
+
+            // Array type: `number[200]` -- a fixed size, given as a
+            // literal, folded straight into the type string ("number[200]")
+            // so nothing else needs a new AST field for it.
+            if (peek().value == "[")
+            {
+                advance();
+                std::string sizeTok = advance().value;
+                type += "[" + sizeTok + "]";
+                if (peek().value == "]")
+                {
+                    advance();
+                }
+            }
         }
 
+        // Arrays are declared with a fixed size and no initializer --
+        // `let nums: number[5];` -- so only parse a value if `=` was
+        // actually written.
+        Node *value = nullptr;
         if (peek().value == "=")
         {
             advance();
+            value = parseExpression();
         }
-
-        Node *value = parseExpression();
 
         VariableDeclaration *node = new VariableDeclaration();
         node->identifier = name;
@@ -219,9 +250,25 @@ private:
 
     Node *parseReturnStatement()
     {
-        advance();
+        advance(); // "return"
+
+        // A bare `return;` with no value is valid (early-exit from a
+        // void function). Only parse an expression if the next token
+        // could actually start one -- otherwise, since ';' produces no
+        // token at all (the lexer discards it), parseExpression() would
+        // fall through to its catch-all and consume whatever comes
+        // next instead (e.g. a block's closing '}'), desynchronizing
+        // the rest of the parse.
+        bool hasValue = peek().type == TokenType::Identifier ||
+                        peek().type == TokenType::Number ||
+                        peek().type == TokenType::Double ||
+                        peek().type == TokenType::String ||
+                        peek().value == "true" || peek().value == "false" ||
+                        peek().value == "(" ||
+                        (peek().type == TokenType::Operator && (peek().value == "!" || peek().value == "-"));
+
         ReturnStatement *node = new ReturnStatement();
-        node->value = parseExpression();
+        node->value = hasValue ? parseExpression() : nullptr;
         return node;
     }
 
@@ -307,6 +354,37 @@ private:
     {
         std::string name = advance().value;
 
+        if (peek().value == "[")
+        {
+            advance();
+            Node *indexExpr = parseExpression();
+            if (peek().value == "]")
+            {
+                advance();
+            }
+
+            if (peek().value == "=")
+            {
+                advance();
+                IndexAssignment *node = new IndexAssignment();
+                Identifier *obj = new Identifier();
+                obj->name = name;
+                node->object = obj;
+                node->index = indexExpr;
+                node->value = parseExpression();
+                return node;
+            }
+
+            // `name[i]` used as a bare statement (rare, but falls back
+            // safely rather than dropping the tokens).
+            IndexExpression *idx = new IndexExpression();
+            Identifier *obj = new Identifier();
+            obj->name = name;
+            idx->object = obj;
+            idx->index = indexExpr;
+            return idx;
+        }
+
         if (peek().value == "=")
         {
             advance();
@@ -369,14 +447,14 @@ private:
             return val;
         }
 
-        if (tok.type == TokenType::Float)
+        if (tok.type == TokenType::Double)
         {
-            LiteralFloat *val = new LiteralFloat();
+            LiteralDoudle *val = new LiteralDoudle();
             val->value = std::stod(tok.value);
             return val;
         }
 
-        if (tok.type == TokenType::Str)
+        if (tok.type == TokenType::String)
         {
             LiteralString *val = new LiteralString();
             val->value = tok.value;
@@ -501,14 +579,14 @@ private:
             return val;
         }
 
-        if (peek().type == TokenType::Float)
+        if (peek().type == TokenType::Double)
         {
-            LiteralFloat *val = new LiteralFloat();
+            LiteralDoudle *val = new LiteralDoudle();
             val->value = std::stod(advance().value);
             return val;
         }
 
-        if (peek().type == TokenType::Str)
+        if (peek().type == TokenType::String)
         {
             LiteralString *val = new LiteralString();
             val->value = advance().value;

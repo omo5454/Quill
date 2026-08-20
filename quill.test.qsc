@@ -26,7 +26,7 @@ printf("10 - 3 = " + sub);
 printf("6 * 7 = " + mul);
 printf("20 / 4 = " + div);
 
-# ─── Float arithmetic ────────────────────────────────────────────────────────
+# ─── Double arithmetic ────────────────────────────────────────────────────────
 
 let radius = 5.0;
 let area = pi * radius * radius;
@@ -151,7 +151,7 @@ while (outer < 3) {
 
 # ─── Functions ───────────────────────────────────────────────────────────────
 
-func greet(name: str) {
+func greet(name: string) {
     return "Hello, " + name + "!";
 }
 
@@ -208,9 +208,6 @@ timesTwo(12);
 
 let strLen = len("Quill language");
 printf("len of string = " + strLen);
-
-let rnd = random();
-printf("random number: " + rnd);
 
 # ─── Incrementation ──────────────────────────────────────────────────────────
 

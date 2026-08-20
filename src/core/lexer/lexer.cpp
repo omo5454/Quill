@@ -140,7 +140,7 @@ private:
             while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
                 ++pos_;
             }
-            return Token{TokenType::Float, input_.substr(start, pos_ - start)};
+            return Token{TokenType::Double, input_.substr(start, pos_ - start)};
         }
 
         return Token{TokenType::Number, input_.substr(start, pos_ - start)};
@@ -169,7 +169,7 @@ private:
             ++pos_;
         }
 
-        return Token{TokenType::Str, out};
+        return Token{TokenType::String, out};
     }
 
     std::string input_;

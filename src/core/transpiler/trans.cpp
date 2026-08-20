@@ -34,11 +34,11 @@ namespace
     }
     std::string convertTypeName(const std::string &typeName)
     {
-        if (typeName == "int")
+        if (typeName == "number")
             return "int";
-        if (typeName == "float")
+        if (typeName == "double")
             return "double";
-        if (typeName == "str")
+        if (typeName == "string")
             return "const char*";
         if (typeName == "bool")
             return "bool";
@@ -50,7 +50,7 @@ namespace
     {
         Null,
         Int,
-        Float,
+        Doudle,
         String,
         Bool
     };
@@ -59,7 +59,7 @@ namespace
     {
         RuntimeType type = RuntimeType::Null;
         long long asInt = 0;
-        double asFloat = 0.0;
+        double asDoudle = 0.0;
         std::string asString;
         bool asBool = false;
     };
@@ -72,11 +72,11 @@ namespace
         return out;
     }
 
-    RuntimeValue makeFloat(double v)
+    RuntimeValue makeDoudle(double v)
     {
         RuntimeValue out;
-        out.type = RuntimeType::Float;
-        out.asFloat = v;
+        out.type = RuntimeType::Doudle;
+        out.asDoudle = v;
         return out;
     }
 
@@ -102,8 +102,8 @@ namespace
         {
         case RuntimeType::Int:
             return std::to_string(value.asInt);
-        case RuntimeType::Float:
-            return std::to_string(value.asFloat);
+        case RuntimeType::Doudle:
+            return std::to_string(value.asDoudle);
         case RuntimeType::String:
             return value.asString;
         case RuntimeType::Bool:
@@ -226,9 +226,9 @@ namespace
                 {
                     throw std::runtime_error("undefined identifier: " + inc->identifier);
                 }
-                if (it->second.type == RuntimeType::Float)
+                if (it->second.type == RuntimeType::Doudle)
                 {
-                    it->second.asFloat += 1.0;
+                    it->second.asDoudle += 1.0;
                 }
                 else
                 {
@@ -244,9 +244,9 @@ namespace
                 {
                     throw std::runtime_error("undefined identifier: " + dec->identifier);
                 }
-                if (it->second.type == RuntimeType::Float)
+                if (it->second.type == RuntimeType::Doudle)
                 {
-                    it->second.asFloat -= 1.0;
+                    it->second.asDoudle -= 1.0;
                 }
                 else
                 {
@@ -267,9 +267,9 @@ namespace
             {
                 return makeInt(lit->value);
             }
-            if (auto *lit = dynamic_cast<LiteralFloat *>(node))
+            if (auto *lit = dynamic_cast<LiteralDoudle *>(node))
             {
-                return makeFloat(lit->value);
+                return makeDoudle(lit->value);
             }
             if (auto *lit = dynamic_cast<LiteralString *>(node))
             {
@@ -299,33 +299,33 @@ namespace
                     {
                         return makeString(stringifyValue(left) + stringifyValue(right));
                     }
-                    if (left.type == RuntimeType::Float || right.type == RuntimeType::Float)
+                    if (left.type == RuntimeType::Doudle || right.type == RuntimeType::Doudle)
                     {
-                        return makeFloat((left.type == RuntimeType::Float ? left.asFloat : left.asInt) + (right.type == RuntimeType::Float ? right.asFloat : right.asInt));
+                        return makeDoudle((left.type == RuntimeType::Doudle ? left.asDoudle : left.asInt) + (right.type == RuntimeType::Doudle ? right.asDoudle : right.asInt));
                     }
                     return makeInt(left.asInt + right.asInt);
                 }
                 if (bin->op == "-")
                 {
-                    if (left.type == RuntimeType::Float || right.type == RuntimeType::Float)
+                    if (left.type == RuntimeType::Doudle || right.type == RuntimeType::Doudle)
                     {
-                        return makeFloat((left.type == RuntimeType::Float ? left.asFloat : left.asInt) - (right.type == RuntimeType::Float ? right.asFloat : right.asInt));
+                        return makeDoudle((left.type == RuntimeType::Doudle ? left.asDoudle : left.asInt) - (right.type == RuntimeType::Doudle ? right.asDoudle : right.asInt));
                     }
                     return makeInt(left.asInt - right.asInt);
                 }
                 if (bin->op == "*")
                 {
-                    if (left.type == RuntimeType::Float || right.type == RuntimeType::Float)
+                    if (left.type == RuntimeType::Doudle || right.type == RuntimeType::Doudle)
                     {
-                        return makeFloat((left.type == RuntimeType::Float ? left.asFloat : left.asInt) * (right.type == RuntimeType::Float ? right.asFloat : right.asInt));
+                        return makeDoudle((left.type == RuntimeType::Doudle ? left.asDoudle : left.asInt) * (right.type == RuntimeType::Doudle ? right.asDoudle : right.asInt));
                     }
                     return makeInt(left.asInt * right.asInt);
                 }
                 if (bin->op == "/")
                 {
-                    if (left.type == RuntimeType::Float || right.type == RuntimeType::Float)
+                    if (left.type == RuntimeType::Doudle || right.type == RuntimeType::Doudle)
                     {
-                        return makeFloat((left.type == RuntimeType::Float ? left.asFloat : left.asInt) / (right.type == RuntimeType::Float ? right.asFloat : right.asInt));
+                        return makeDoudle((left.type == RuntimeType::Doudle ? left.asDoudle : left.asInt) / (right.type == RuntimeType::Doudle ? right.asDoudle : right.asInt));
                     }
                     return makeInt(left.asInt / right.asInt);
                 }
@@ -335,8 +335,8 @@ namespace
                     {
                         return makeBool(left.asString == right.asString);
                     }
-                    return makeBool((left.type == RuntimeType::Float || right.type == RuntimeType::Float ? (left.type == RuntimeType::Float ? left.asFloat : left.asInt) : left.asInt) ==
-                                    (right.type == RuntimeType::Float || left.type == RuntimeType::Float ? (right.type == RuntimeType::Float ? right.asFloat : right.asInt) : right.asInt));
+                    return makeBool((left.type == RuntimeType::Doudle || right.type == RuntimeType::Doudle ? (left.type == RuntimeType::Doudle ? left.asDoudle : left.asInt) : left.asInt) ==
+                                    (right.type == RuntimeType::Doudle || left.type == RuntimeType::Doudle ? (right.type == RuntimeType::Doudle ? right.asDoudle : right.asInt) : right.asInt));
                 }
                 if (bin->op == "<")
                 {
@@ -344,7 +344,7 @@ namespace
                     {
                         return makeBool(left.asString < right.asString);
                     }
-                    return makeBool((left.type == RuntimeType::Float ? left.asFloat : left.asInt) < (right.type == RuntimeType::Float ? right.asFloat : right.asInt));
+                    return makeBool((left.type == RuntimeType::Doudle ? left.asDoudle : left.asInt) < (right.type == RuntimeType::Doudle ? right.asDoudle : right.asInt));
                 }
                 if (bin->op == ">")
                 {
@@ -352,7 +352,7 @@ namespace
                     {
                         return makeBool(left.asString > right.asString);
                     }
-                    return makeBool((left.type == RuntimeType::Float ? left.asFloat : left.asInt) > (right.type == RuntimeType::Float ? right.asFloat : right.asInt));
+                    return makeBool((left.type == RuntimeType::Doudle ? left.asDoudle : left.asInt) > (right.type == RuntimeType::Doudle ? right.asDoudle : right.asInt));
                 }
                 if (bin->op == "<=")
                 {
@@ -360,7 +360,7 @@ namespace
                     {
                         return makeBool(left.asString <= right.asString);
                     }
-                    return makeBool((left.type == RuntimeType::Float ? left.asFloat : left.asInt) <= (right.type == RuntimeType::Float ? right.asFloat : right.asInt));
+                    return makeBool((left.type == RuntimeType::Doudle ? left.asDoudle : left.asInt) <= (right.type == RuntimeType::Doudle ? right.asDoudle : right.asInt));
                 }
                 if (bin->op == ">=")
                 {
@@ -368,7 +368,7 @@ namespace
                     {
                         return makeBool(left.asString >= right.asString);
                     }
-                    return makeBool((left.type == RuntimeType::Float ? left.asFloat : left.asInt) >= (right.type == RuntimeType::Float ? right.asFloat : right.asInt));
+                    return makeBool((left.type == RuntimeType::Doudle ? left.asDoudle : left.asInt) >= (right.type == RuntimeType::Doudle ? right.asDoudle : right.asInt));
                 }
                 return RuntimeValue{};
             }
@@ -378,9 +378,9 @@ namespace
                 RuntimeValue value = evalNode(unary->operand);
                 if (unary->op == "-")
                 {
-                    if (value.type == RuntimeType::Float)
+                    if (value.type == RuntimeType::Doudle)
                     {
-                        return makeFloat(-value.asFloat);
+                        return makeDoudle(-value.asDoudle);
                     }
                     return makeInt(-value.asInt);
                 }
@@ -409,23 +409,23 @@ namespace
         }
     };
     // Maps any spelling of a Quill/C type name to Quill's own canonical
-    // name ("int", "float", "str", "bool", "void"). Unknown/future type
-    // names fall back to "int" so a typo doesn't crash the transpiler --
+    // name ("number", "double", "string", "bool", "void"). Unknown/future type
+    // names fall back to "number" so a typo doesn't crash the transpiler --
     // the typechecker is responsible for catching genuine type errors.
     std::string normalizeTypeName(const std::string &typeName)
     {
         std::string type = trim(typeName);
-        if (type == "str" || type == "const char*")
-            return "str";
-        if (type == "float" || type == "double")
-            return "float";
+        if (type == "string" || type == "const char*")
+            return "string";
+        if (type == "double" || type == "double")
+            return "double";
         if (type == "bool")
             return "bool";
-        if (type == "int")
-            return "int";
+        if (type == "number")
+            return "number";
         if (type == "void")
             return "void";
-        return "int";
+        return "number";
     }
 
     // ------------------------------------------------------------------
@@ -457,11 +457,11 @@ namespace
             return "void";
 
         if (dynamic_cast<LiteralInt *>(node))
-            return "int";
-        if (dynamic_cast<LiteralFloat *>(node))
-            return "float";
+            return "number";
+        if (dynamic_cast<LiteralDoudle *>(node))
+            return "double";
         if (dynamic_cast<LiteralString *>(node))
-            return "str";
+            return "string";
         if (dynamic_cast<LiteralBool *>(node))
             return "bool";
 
@@ -472,13 +472,13 @@ namespace
             // identifiers before we ever get here, so a miss just means
             // "not tracked in this scope" -- fall back to int rather
             // than crash the transpiler.
-            return it != scope.end() ? it->second : "int";
+            return it != scope.end() ? it->second : "number";
         }
 
         // Indexing a str with [] yields a character -- represented as
         // an int, the same way C represents char.
         if (dynamic_cast<IndexExpression *>(node))
-            return "int";
+            return "number";
 
         if (auto *bin = dynamic_cast<BinaryExpression *>(node))
         {
@@ -492,15 +492,15 @@ namespace
             std::string leftType = inferNodeType(bin->left, scope, functionReturnTypes);
             std::string rightType = inferNodeType(bin->right, scope, functionReturnTypes);
 
-            if (bin->op == "+" && (leftType == "str" || rightType == "str"))
+            if (bin->op == "+" && (leftType == "string" || rightType == "string"))
             {
-                return "str";
+                return "string";
             }
-            if (leftType == "float" || rightType == "float")
+            if (leftType == "double" || rightType == "double")
             {
-                return "float";
+                return "double";
             }
-            return "int";
+            return "number";
         }
 
         if (auto *unary = dynamic_cast<UnaryExpression *>(node))
@@ -513,10 +513,10 @@ namespace
         if (auto *call = dynamic_cast<CallExpression *>(node))
         {
             auto it = functionReturnTypes.find(call->callee);
-            return it != functionReturnTypes.end() ? it->second : "int";
+            return it != functionReturnTypes.end() ? it->second : "number";
         }
 
-        return "int";
+        return "number";
     }
 
     void collectDeclaredLocals(const std::vector<Node *> &stmts,
@@ -531,7 +531,16 @@ namespace
             if (auto *decl = dynamic_cast<VariableDeclaration *>(node))
             {
                 std::string type;
-                if (!decl->declaredType.empty())
+                bool isArrayType = decl->declaredType.find('[') != std::string::npos;
+                if (isArrayType)
+                {
+                    // Array types ("number[200]") are kept as-written --
+                    // normalizeTypeName only knows scalar type names, so
+                    // running it over "number[200]" would lose the size
+                    // and fall back to a plain scalar.
+                    type = decl->declaredType;
+                }
+                else if (!decl->declaredType.empty())
                 {
                     type = normalizeTypeName(decl->declaredType);
                 }
@@ -564,7 +573,7 @@ namespace
         std::map<std::string, std::string> scope;
         for (const Param &p : params)
         {
-            scope[p.name] = p.type.empty() ? "int" : normalizeTypeName(p.type);
+            scope[p.name] = p.type.empty() ? "number" : normalizeTypeName(p.type);
         }
         collectDeclaredLocals(body, scope, functionReturnTypes);
         return scope;
@@ -622,8 +631,8 @@ namespace
     std::map<std::string, std::string> buildFunctionReturnTypes(const Program &program)
     {
         std::map<std::string, std::string> types;
-        types["len"] = "int";
-        types["toString"] = "str";
+        types["len"] = "number";
+        types["toString"] = "string";
 
         for (Node *node : program.body)
         {
@@ -661,9 +670,9 @@ namespace
     {
         std::string type = inferNodeType(node, scope, functionReturnTypes);
         std::string code = astToC(node, scope, functionReturnTypes);
-        if (type == "str")
+        if (type == "string")
             return code;
-        if (type == "float")
+        if (type == "double")
             return "quill_ftoa(" + code + ")";
         if (type == "bool")
             return "((" + code + ") ? \"true\" : \"false\")";
@@ -681,7 +690,21 @@ namespace
         if (auto *decl = dynamic_cast<VariableDeclaration *>(node))
         {
             auto it = scope.find(decl->identifier);
-            std::string typeName = it != scope.end() ? it->second : "int";
+            std::string typeName = it != scope.end() ? it->second : "number";
+
+            // Arrays ("number[200]") declare as a real C array, with no
+            // initializer -- C zero-initializes a plain declaration like
+            // this at file/function scope isn't guaranteed, but for a
+            // local it's left as garbage same as C itself would; the
+            // point of the type is the fixed-size buffer, not zeroing.
+            auto bracketPos = typeName.find('[');
+            if (bracketPos != std::string::npos)
+            {
+                std::string baseType = typeName.substr(0, bracketPos);
+                std::string sizePart = typeName.substr(bracketPos); // "[200]"
+                return convertTypeName(baseType) + " " + decl->identifier + sizePart + ";";
+            }
+
             std::string type = convertTypeName(typeName);
             std::string val = decl->value ? astToC(decl->value, scope, functionReturnTypes) : "0";
             return type + " " + decl->identifier + " = " + val + ";";
@@ -693,6 +716,14 @@ namespace
             return assign->identifier + " = " + astToC(assign->value, scope, functionReturnTypes) + ";";
         }
 
+        // nums[i] = value; -- writing into an array slot.
+        if (auto *idxAssign = dynamic_cast<IndexAssignment *>(node))
+        {
+            return astToC(idxAssign->object, scope, functionReturnTypes) + "[" +
+                   astToC(idxAssign->index, scope, functionReturnTypes) + "] = " +
+                   astToC(idxAssign->value, scope, functionReturnTypes) + ";";
+        }
+
         // Binary operations -- '+' on anything involving a string becomes
         // a quill_concat() call instead of an invalid C '+' on pointers.
         if (auto *bin = dynamic_cast<BinaryExpression *>(node))
@@ -701,7 +732,7 @@ namespace
             {
                 std::string leftType = inferNodeType(bin->left, scope, functionReturnTypes);
                 std::string rightType = inferNodeType(bin->right, scope, functionReturnTypes);
-                if (leftType == "str" || rightType == "str")
+                if (leftType == "string" || rightType == "string")
                 {
                     return "quill_concat(" +
                            toCStringExpr(bin->left, scope, functionReturnTypes) + ", " +
@@ -720,8 +751,8 @@ namespace
         // Literals
         if (auto *litInt = dynamic_cast<LiteralInt *>(node))
             return std::to_string(litInt->value);
-        if (auto *litFloat = dynamic_cast<LiteralFloat *>(node))
-            return std::to_string(litFloat->value);
+        if (auto *litDoudle = dynamic_cast<LiteralDoudle *>(node))
+            return std::to_string(litDoudle->value);
         if (auto *litBool = dynamic_cast<LiteralBool *>(node))
             return litBool->value ? "true" : "false";
         if (auto *litStr = dynamic_cast<LiteralString *>(node))
@@ -743,9 +774,9 @@ namespace
         {
             std::string exprCode = astToC(print->expression, scope, functionReturnTypes);
             std::string type = inferNodeType(print->expression, scope, functionReturnTypes);
-            if (type == "str")
+            if (type == "string")
                 return "printf(\"%s\\n\", " + exprCode + ");";
-            if (type == "float")
+            if (type == "double")
                 return "printf(\"%f\\n\", " + exprCode + ");";
             if (type == "bool")
                 return "printf(\"%s\\n\", (" + exprCode + ") ? \"true\" : \"false\");";
@@ -844,21 +875,21 @@ namespace
             }
             else if (name == "input" && argCodes.size() == 1)
             {
-                if (argTypes[0] == "str")
+                if (argTypes[0] == "string")
                     return "// string type not supported on input.";
-                if (argTypes[0] == "int")
+                if (argTypes[0] == "number")
                     return "scanf(\"%d\", &" + argCodes[0] + ")";
 
-                if (argTypes[0] == "float")
+                if (argTypes[0] == "double")
                     return "scanf(\"%lf\", &" + argCodes[0] + ")";
 
                 return "scanf(\"%d\", &" + argCodes[0] + ")";
             }
             else if (name == "toString" && argCodes.size() == 1)
             {
-                if (argTypes[0] == "str")
+                if (argTypes[0] == "string")
                     return argCodes[0];
-                if (argTypes[0] == "float")
+                if (argTypes[0] == "double")
                     return "quill_ftoa(" + argCodes[0] + ")";
                 if (argTypes[0] == "bool")
                     return "((" + argCodes[0] + ") ? \"true\" : \"false\")";

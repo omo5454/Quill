@@ -1,11 +1,11 @@
-func Pow(n: int, x: float){
-    let N: int = n;
+func Pow(n: number, x: double){
+    let N: number = n;
     if(N < 0) {
         x = 1 / x;
         N = -N;
     }
 
-    let res: float = 1.0;
+    let res: double = 1.0;
     while(N > 0){
         if(N % 2 == 1) {
             res = res * x;

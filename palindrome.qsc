@@ -1,9 +1,9 @@
-func isPalindrome(x: int) {
+func isPalindrome(x: number) {
     if (x < 0){
         return false;
     }
-    let num: int = x;
-    let reversed: int = 0;
+    let num: number = x;
+    let reversed: number = 0;
 
     while(num != 0){
         reversed = reversed * 10 + num % 10;

@@ -49,11 +49,11 @@ quill-[os] myfile.qsc -o output.c
 Variables are declared with `let`. Type annotations are supported.
 
 ```quill
-let x: int = 5;
-let name: str = "Alice";
-let pi: float = 3.14;
+let x: number = 5;
+let name: string = "Alice";
+let pi: double = 3.14;
 let active: bool = true;
-let counter: int = 0;
+let counter: number = 0;
 
 ```
 
@@ -71,7 +71,7 @@ printf("Hello " + name);
 let sum = 10 + 5;
 let product = 6 * 7;
 
-let i: int = 0;
+let i: number = 0;
 i++;   # increment
 i--;   # decrement
 
@@ -82,7 +82,7 @@ i--;   # decrement
 Conditions do not require parentheses.
 
 ```quill
-let score: int = 75;
+let score: number = 75;
 
 if score >= 90 {
     say "Grade: A";
@@ -92,7 +92,7 @@ if score >= 90 {
     say "Grade: F";
 }
 
-let x: int = 0;
+let x: number = 0;
 while x < 5 {
     printf("x: " + x);
     x++;
@@ -105,15 +105,15 @@ while x < 5 {
 Functions must be declared before they are called.
 
 ```quill
-func add(a: int, b: int): int {
+func add(a: number, b: number): number {
     return a + b;
 }
 
-func greet(name: str): str {
+func greet(name: string): string {
     return "Hello, " + name;
 }
 
-let result: int = add(3, 4);
+let result: number = add(3, 4);
 say greet("Alice");
 
 ```
@@ -126,9 +126,9 @@ Quill runs static type checking before generating bytecode or C++ output.
 
 | Type | Example |
 | --- | --- |
-| `int` | `42` |
-| `float` | `3.14` |
-| `str` | `"hello"` |
+| `number` | `42` |
+| `double` | `3.14` |
+| `string` | `"hello"` |
 | `bool` | `true` / `false` |
 | `void` | Functions with no return value |
 
