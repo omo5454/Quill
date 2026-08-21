@@ -24,11 +24,13 @@ func twoSum(): string {
         let j: number = i + 1;
         while j < count {
             if nums[i] + nums[j] == target {
-                return "[" + i + ", " + j + "]";
+                return "" + i + "," + j;
             }
             j++;
         }
         i++;
     }
-    return "no pair found";
+    return "0";
 }
+
+printf(twoSum())
