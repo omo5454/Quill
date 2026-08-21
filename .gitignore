@@ -1,21 +1,3 @@
-node_modules
-__pycache__/
-.pytest_cache/
-*.pyc
-*.pyo
-*.iss
-xcbuild
-
-info.txt
-dev.quill
-minify.ps1
-Dev-Internal.md
-Check-List.md
-
-images
-versions
-releases
-
 # Build output
 bin/
 *.zip
@@ -24,11 +6,9 @@ bin/
 quill-linux
 quill-macos-intel
 quill-macos-arm
-quill-c-linux
-quill-c-macos-intel
-quill-c-macos-arm
 hidden*
 *.vsix
+internal
 
 # Test artifacts
 *.tmp
@@ -38,4 +18,3 @@ tests/.tmp/
 # Misc
 .DS_Store
 Thumbs.db
-src-t/

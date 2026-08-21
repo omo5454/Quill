@@ -3,115 +3,144 @@
 #include <string>
 #include <vector>
 
-struct Node {
+struct Node
+{
     virtual ~Node() = default;
 };
 
-struct Program {
-    std::vector<Node*> body;
+struct Program
+{
+    std::vector<Node *> body;
 };
 
-struct Param {
+struct Param
+{
     std::string name;
     std::string type;
 };
 
-struct VariableDeclaration : Node {
+struct VariableDeclaration : Node
+{
     std::string identifier;
     std::string declaredType;
-    Node* value = nullptr;
+    Node *value = nullptr;
 };
 
-struct Function : Node {
+struct Function : Node
+{
     std::string name;
     std::vector<Param> params;
     std::string returnType;
-    std::vector<Node*> body;
+    std::vector<Node *> body;
 };
 
-struct ReturnStatement : Node {
-    Node* value = nullptr;
+struct ReturnStatement : Node
+{
+    Node *value = nullptr;
 };
 
-struct PrintStatement : Node {
-    Node* expression = nullptr;
+struct PrintStatement : Node
+{
+    Node *expression = nullptr;
 };
 
-struct IfStatement : Node {
-    Node* condition = nullptr;
-    std::vector<Node*> consequent;
-    std::vector<Node*> alternate;
+struct IfStatement : Node
+{
+    Node *condition = nullptr;
+    std::vector<Node *> consequent;
+    std::vector<Node *> alternate;
 };
 
-struct WhileLoop : Node {
-    Node* condition = nullptr;
-    std::vector<Node*> body;
+struct WhileLoop : Node
+{
+    Node *condition = nullptr;
+    std::vector<Node *> body;
 };
 
-struct Comment : Node {
+struct Comment : Node
+{
     std::string value;
 };
 
-struct BinaryExpression : Node {
-    Node* left = nullptr;
+struct BinaryExpression : Node
+{
+    Node *left = nullptr;
     std::string op;
-    Node* right = nullptr;
+    Node *right = nullptr;
 };
 
-struct CallExpression : Node {
+struct CallExpression : Node
+{
     std::string callee;
-    std::vector<Node*> arguments;
+    std::vector<Node *> arguments;
 };
 
-struct Increment : Node {
+struct Increment : Node
+{
     std::string identifier;
 };
 
-struct Decrement : Node {
+struct Decrement : Node
+{
     std::string identifier;
 };
 
-struct Identifier : Node {
+struct Identifier : Node
+{
     std::string name;
 };
 
-struct LiteralInt : Node {
+struct LiteralInt : Node
+{
     long long value = 0;
 };
 
-struct LiteralDoudle : Node {
+struct LiteralDoudle : Node
+{
     double value = 0.0;
 };
 
-struct LiteralString : Node {
+struct LiteralString : Node
+{
     std::string value;
 };
 
-struct LiteralBool : Node {
+struct LiteralBool : Node
+{
     bool value = false;
 };
 
-struct IndexExpression : Node {
-    Node* object = nullptr;
-    Node* index = nullptr;
+struct IndexExpression : Node
+{
+    Node *object = nullptr;
+    Node *index = nullptr;
 };
 
-struct IndexAssignment : Node {
-    Node* object = nullptr;
-    Node* index = nullptr;
-    Node* value = nullptr;
+struct IndexAssignment : Node
+{
+    Node *object = nullptr;
+    Node *index = nullptr;
+    Node *value = nullptr;
 };
 
-struct Assignment : Node {
+struct Assignment : Node
+{
     std::string identifier;
-    Node* value = nullptr;
+    Node *value = nullptr;
 };
 
-struct ExpressionStatement : Node {
-    Node* expression = nullptr;
+struct ExpressionStatement : Node
+{
+    Node *expression = nullptr;
 };
 
-struct UnaryExpression : Node {
+struct UnaryExpression : Node
+{
     std::string op;
-    Node* operand = nullptr;
+    Node *operand = nullptr;
+};
+
+struct ImportStatement : Node
+{
+    std::string path;
 };

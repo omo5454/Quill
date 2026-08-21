@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <unordered_map>
@@ -46,72 +47,6 @@ namespace
             return "void";
         return typeName;
     }
-    enum class RuntimeType
-    {
-        Null,
-        Int,
-        Doudle,
-        String,
-        Bool
-    };
-
-    struct RuntimeValue
-    {
-        RuntimeType type = RuntimeType::Null;
-        long long asInt = 0;
-        double asDoudle = 0.0;
-        std::string asString;
-        bool asBool = false;
-    };
-
-    RuntimeValue makeInt(long long v)
-    {
-        RuntimeValue out;
-        out.type = RuntimeType::Int;
-        out.asInt = v;
-        return out;
-    }
-
-    RuntimeValue makeDoudle(double v)
-    {
-        RuntimeValue out;
-        out.type = RuntimeType::Doudle;
-        out.asDoudle = v;
-        return out;
-    }
-
-    RuntimeValue makeString(const std::string &v)
-    {
-        RuntimeValue out;
-        out.type = RuntimeType::String;
-        out.asString = v;
-        return out;
-    }
-
-    RuntimeValue makeBool(bool v)
-    {
-        RuntimeValue out;
-        out.type = RuntimeType::Bool;
-        out.asBool = v;
-        return out;
-    }
-
-    std::string stringifyValue(const RuntimeValue &value)
-    {
-        switch (value.type)
-        {
-        case RuntimeType::Int:
-            return std::to_string(value.asInt);
-        case RuntimeType::Doudle:
-            return std::to_string(value.asDoudle);
-        case RuntimeType::String:
-            return value.asString;
-        case RuntimeType::Bool:
-            return value.asBool ? "true" : "false";
-        default:
-            return "";
-        }
-    }
 
     // Maps any spelling of a Quill/C type name to Quill's own canonical
     // name ("number", "double", "string", "bool", "void"). Unknown/future type
@@ -133,27 +68,6 @@ namespace
         return "number";
     }
 
-    // ------------------------------------------------------------------
-    // Type inference and per-scope symbol tables.
-    //
-    // The old transpiler re-scanned the raw source text for "let"/"mut"
-    // lines and built ONE flat, file-wide name -> type map. That has two
-    // problems that only show up once real programs are written by real
-    // people:
-    //   1. Two functions that both happen to use a variable called `x`
-    //      (or `i`, `result`, `total`, ...) stomp on each other's type,
-    //      because there's only one map for the whole file.
-    //   2. Function parameters were never added to that map at all, and
-    //      a `let` with no explicit `: type` was skipped entirely, so
-    //      both silently defaulted to `int` no matter what they held.
-    //
-    // Below, every function (and the top-level "main" body) gets its own
-    // scope, built straight from the AST: parameters come from
-    // Function::params, and each local's type comes from its own
-    // declaredType if it wrote one, or is inferred from its initializer
-    // if it didn't. Nothing is guessed from raw text.
-    // ------------------------------------------------------------------
-
     std::string inferNodeType(Node *node,
                               const std::map<std::string, std::string> &scope,
                               const std::map<std::string, std::string> &functionReturnTypes)
@@ -173,17 +87,25 @@ namespace
         if (auto *ident = dynamic_cast<Identifier *>(node))
         {
             auto it = scope.find(ident->name);
-            // The typechecker already rejects genuinely undefined
-            // identifiers before we ever get here, so a miss just means
-            // "not tracked in this scope" -- fall back to int rather
-            // than crash the transpiler.
             return it != scope.end() ? it->second : "number";
         }
 
-        // Indexing a str with [] yields a character -- represented as
-        // an int, the same way C represents char.
-        if (dynamic_cast<IndexExpression *>(node))
+        // Indexing yields either a character code (indexing a plain
+        // string -- always "number", same as C's char) or, for a real
+        // array, the array's own element type ("string[3]" indexed
+        // gives "string", "double[2]" gives "double", etc.) -- not
+        // unconditionally "number", which was only ever correct back
+        // when number[] was the only array element type in use.
+        if (auto *idx = dynamic_cast<IndexExpression *>(node))
+        {
+            std::string objType = inferNodeType(idx->object, scope, functionReturnTypes);
+            auto bracketPos = objType.find('[');
+            if (bracketPos != std::string::npos)
+            {
+                return objType.substr(0, bracketPos);
+            }
             return "number";
+        }
 
         if (auto *bin = dynamic_cast<BinaryExpression *>(node))
         {
@@ -239,10 +161,6 @@ namespace
                 bool isArrayType = decl->declaredType.find('[') != std::string::npos;
                 if (isArrayType)
                 {
-                    // Array types ("number[200]") are kept as-written --
-                    // normalizeTypeName only knows scalar type names, so
-                    // running it over "number[200]" would lose the size
-                    // and fall back to a plain scalar.
                     type = decl->declaredType;
                 }
                 else if (!decl->declaredType.empty())
@@ -267,10 +185,6 @@ namespace
         }
     }
 
-    // Builds one scope: parameters first, then every local declared
-    // anywhere in the body (including inside if/while blocks -- this
-    // matches how TypeChecker itself tracks symbols, so codegen and type
-    // checking never disagree about what's in scope).
     std::map<std::string, std::string> buildScope(const std::vector<Param> &params,
                                                   const std::vector<Node *> &body,
                                                   const std::map<std::string, std::string> &functionReturnTypes)
@@ -284,11 +198,6 @@ namespace
         return scope;
     }
 
-    // Return-type annotations are optional in Quill (only parameter
-    // types are required by the grammar). When a function omits one,
-    // infer its return type from what it actually returns -- searching
-    // inside if/while blocks too, not just the top level of the body,
-    // since a `return` is very often written inside a branch.
     std::string inferFunctionReturnType(const std::vector<Node *> &body,
                                         const std::map<std::string, std::string> &scope,
                                         const std::map<std::string, std::string> &functionReturnTypes)
@@ -324,15 +233,6 @@ namespace
         return "void";
     }
 
-    // Seeds the stdlib's known signatures, then resolves every
-    // user-defined function's return type: the explicit annotation if
-    // the student wrote one, otherwise inference from its `return`
-    // statements. Walking program.body in order and adding each
-    // function's type as we go (rather than computing them all
-    // independently) means a function's own return-inference can see
-    // the resolved types of every function declared before it --
-    // exactly the "must be declared before called" rule Quill already
-    // requires, so this never needs a forward reference.
     std::map<std::string, std::string> buildFunctionReturnTypes(const Program &program)
     {
         std::map<std::string, std::string> types;
@@ -357,18 +257,10 @@ namespace
         return types;
     }
 
-    // ------------------------------------------------------------------
-    // AST -> C codegen.
-    // ------------------------------------------------------------------
-
     std::string astToC(Node *node,
                        const std::map<std::string, std::string> &scope,
                        const std::map<std::string, std::string> &functionReturnTypes);
 
-    // Renders `node` as a C expression that evaluates to a `const char*`,
-    // converting non-string values through the small runtime helpers
-    // emitted at the top of every generated file. This is what makes
-    // `"score: " + score` (int + str) work, per the language tour.
     std::string toCStringExpr(Node *node,
                               const std::map<std::string, std::string> &scope,
                               const std::map<std::string, std::string> &functionReturnTypes)
@@ -391,22 +283,16 @@ namespace
         if (!node)
             return "";
 
-        // Variable declarations
         if (auto *decl = dynamic_cast<VariableDeclaration *>(node))
         {
             auto it = scope.find(decl->identifier);
             std::string typeName = it != scope.end() ? it->second : "number";
 
-            // Arrays ("number[200]") declare as a real C array, with no
-            // initializer -- C zero-initializes a plain declaration like
-            // this at file/function scope isn't guaranteed, but for a
-            // local it's left as garbage same as C itself would; the
-            // point of the type is the fixed-size buffer, not zeroing.
             auto bracketPos = typeName.find('[');
             if (bracketPos != std::string::npos)
             {
                 std::string baseType = typeName.substr(0, bracketPos);
-                std::string sizePart = typeName.substr(bracketPos); // "[200]"
+                std::string sizePart = typeName.substr(bracketPos);
                 return convertTypeName(baseType) + " " + decl->identifier + sizePart + ";";
             }
 
@@ -415,13 +301,11 @@ namespace
             return type + " " + decl->identifier + " = " + val + ";";
         }
 
-        // Assignments
         if (auto *assign = dynamic_cast<Assignment *>(node))
         {
             return assign->identifier + " = " + astToC(assign->value, scope, functionReturnTypes) + ";";
         }
 
-        // nums[i] = value; -- writing into an array slot.
         if (auto *idxAssign = dynamic_cast<IndexAssignment *>(node))
         {
             return astToC(idxAssign->object, scope, functionReturnTypes) + "[" +
@@ -429,8 +313,6 @@ namespace
                    astToC(idxAssign->value, scope, functionReturnTypes) + ";";
         }
 
-        // Binary operations -- '+' on anything involving a string becomes
-        // a quill_concat() call instead of an invalid C '+' on pointers.
         if (auto *bin = dynamic_cast<BinaryExpression *>(node))
         {
             if (bin->op == "+")
@@ -453,7 +335,6 @@ namespace
             return unary->op + astToC(unary->operand, scope, functionReturnTypes);
         }
 
-        // Literals
         if (auto *litInt = dynamic_cast<LiteralInt *>(node))
             return std::to_string(litInt->value);
         if (auto *litDoudle = dynamic_cast<LiteralDoudle *>(node))
@@ -465,16 +346,12 @@ namespace
         if (auto *ident = dynamic_cast<Identifier *>(node))
             return ident->name;
 
-        // s[i] -- indexing a str. Codegen is trivial since Quill strs
-        // are already C's `const char*`, so this maps straight across.
         if (auto *idx = dynamic_cast<IndexExpression *>(node))
         {
             return astToC(idx->object, scope, functionReturnTypes) + "[" +
                    astToC(idx->index, scope, functionReturnTypes) + "]";
         }
 
-        // say / printf -- picks the right printf() format from the
-        // expression's inferred type instead of dropping the statement.
         if (auto *print = dynamic_cast<PrintStatement *>(node))
         {
             std::string exprCode = astToC(print->expression, scope, functionReturnTypes);
@@ -488,7 +365,6 @@ namespace
             return "printf(\"%d\\n\", " + exprCode + ");";
         }
 
-        // i++ / i--
         if (auto *inc = dynamic_cast<Increment *>(node))
         {
             return inc->identifier + "++;";
@@ -498,11 +374,10 @@ namespace
             return dec->identifier + "--;";
         }
 
-        // Conditionals
         if (auto *ifStmt = dynamic_cast<IfStatement *>(node))
         {
             std::ostringstream block;
-            block << "if " << astToC(ifStmt->condition, scope, functionReturnTypes) << " {\n";
+            block << "if (" << astToC(ifStmt->condition, scope, functionReturnTypes) << ") {\n";
             for (Node *stmt : ifStmt->consequent)
             {
                 block << "        " << astToC(stmt, scope, functionReturnTypes) << "\n";
@@ -520,11 +395,10 @@ namespace
             return block.str();
         }
 
-        // Loops
         if (auto *loop = dynamic_cast<WhileLoop *>(node))
         {
             std::ostringstream block;
-            block << "while " << astToC(loop->condition, scope, functionReturnTypes) << " {\n";
+            block << "while (" << astToC(loop->condition, scope, functionReturnTypes) << ") {\n";
             for (Node *stmt : loop->body)
             {
                 block << "        " << astToC(stmt, scope, functionReturnTypes) << "\n";
@@ -533,7 +407,6 @@ namespace
             return block.str();
         }
 
-        // Expression statements
         if (auto *exprStmt = dynamic_cast<ExpressionStatement *>(node))
         {
             std::string code = astToC(exprStmt->expression, scope, functionReturnTypes);
@@ -544,7 +417,6 @@ namespace
             return code;
         }
 
-        // return
         if (auto *ret = dynamic_cast<ReturnStatement *>(node))
         {
             if (ret->value)
@@ -554,10 +426,6 @@ namespace
             return "return;";
         }
 
-        // Function calls, including the small stdlib (len, toString).
-        // Adding a new stdlib function later means adding one branch
-        // here (and its return type in buildFunctionReturnTypes above)
-        // -- not touching anything else in the transpiler.
         if (auto *call = dynamic_cast<CallExpression *>(node))
         {
             std::string name = call->callee;
@@ -578,7 +446,7 @@ namespace
             {
                 return "(int)strlen(" + argCodes[0] + ")";
             }
-            else if (name == "C_call" && argCodes.size() == 1)
+            else if ((name == "C_call" || name == "C_top") && argCodes.size() == 1)
             {
 
                 std::string& targetStr = argCodes[0];
@@ -627,21 +495,147 @@ namespace
         return "";
     }
 
+    // ------------------------------------------------------------------
+    // import "path.qsc";
+    //
+    // Splices the named file's entire contents -- functions and
+    // top-level code alike -- in place of the import statement, the
+    // same way C's #include works. Nested imports inside an imported
+    // file resolve relative to *that* file's own directory, not the
+    // original file's.
+    // ------------------------------------------------------------------
+
+    std::string resolveImportPath(const std::string &baseDir, const std::string &importPath)
+    {
+        if (!importPath.empty() && importPath[0] == '/')
+        {
+            return importPath; // already absolute
+        }
+        if (baseDir.empty())
+        {
+            return importPath;
+        }
+        return baseDir + "/" + importPath;
+    }
+
+    // `inProgress` tracks paths currently being expanded on this call
+    // stack, so A importing B importing A is reported as a clear cycle
+    // error instead of recursing forever.
+    Program expandImports(const Program &program, const std::string &baseDir, std::set<std::string> &inProgress)
+    {
+        Program expanded;
+        for (Node *node : program.body)
+        {
+            if (!node)
+                continue;
+
+            if (auto *imp = dynamic_cast<ImportStatement *>(node))
+            {
+                std::string resolvedPath = resolveImportPath(baseDir, imp->path);
+
+                if (inProgress.find(resolvedPath) != inProgress.end())
+                {
+                    throw std::runtime_error("import cycle detected involving: " + resolvedPath);
+                }
+
+                std::ifstream importFile(resolvedPath);
+                if (!importFile.is_open())
+                {
+                    throw std::runtime_error("could not open imported file: " + resolvedPath +
+                                              " (imported as \"" + imp->path + "\")");
+                }
+                std::string importedSource((std::istreambuf_iterator<char>(importFile)),
+                                            std::istreambuf_iterator<char>());
+
+                Lexer importLexer(importedSource);
+                std::vector<Token> importTokens = importLexer.tokenize();
+                Parser importParser(importTokens);
+                Program importedProgram = importParser.parse();
+
+                std::size_t slashPos = resolvedPath.find_last_of('/');
+                std::string importedBaseDir = slashPos == std::string::npos ? "" : resolvedPath.substr(0, slashPos);
+
+                inProgress.insert(resolvedPath);
+                Program expandedImport = expandImports(importedProgram, importedBaseDir, inProgress);
+                inProgress.erase(resolvedPath);
+
+                for (Node *importedNode : expandedImport.body)
+                {
+                    expanded.body.push_back(importedNode);
+                }
+            }
+            else
+            {
+                expanded.body.push_back(node);
+            }
+        }
+        return expanded;
+    }
+
+    // Every Quill function becomes its own C function -- two Function
+    // nodes with the same name (whether both written locally, both
+    // pulled in via import, or one of each) would silently emit two C
+    // functions with identical names, which fails to compile. Catching
+    // it here gives a clear Quill-level error instead of a confusing C
+    // compiler error pointing at generated code the student never wrote.
+    void checkForDuplicateFunctions(const Program &program)
+    {
+        std::map<std::string, bool> seen;
+        for (Node *node : program.body)
+        {
+            if (auto *fn = dynamic_cast<Function *>(node))
+            {
+                if (seen.find(fn->name) != seen.end())
+                {
+                    throw std::runtime_error("duplicate function definition: " + fn->name);
+                }
+                seen[fn->name] = true;
+            }
+        }
+    }
+
     class Transpiler
     {
     public:
-        std::string transpile(const std::string &source)
+        std::string transpile(const std::string &source, const std::string &baseDir)
         {
             Lexer lexer(source);
             std::vector<Token> tokens = lexer.tokenize();
             Parser parser(tokens);
             Program program = parser.parse();
 
+            std::set<std::string> inProgress;
+            program = expandImports(program, baseDir, inProgress);
+            checkForDuplicateFunctions(program);
+
+            // Type-checking runs on the *expanded* program -- otherwise
+            // anything defined only in an imported file would never be
+            // checked at all, since the checker would just see an
+            // ImportStatement it doesn't know how to interpret.
+            try
+            {
+                TypeChecker checker;
+                checker.check(program);
+            }
+            catch (const std::exception &ex)
+            {
+                throw std::runtime_error("Type error: " + std::string(ex.what()));
+            }
+
             std::map<std::string, std::string> functionReturnTypes = buildFunctionReturnTypes(program);
             std::map<std::string, std::string> mainScope = buildScope({}, program.body, functionReturnTypes);
 
             std::vector<std::string> functionBlocks;
             std::vector<std::string> mainLines;
+
+            // A C_call() written directly at the top level (not nested
+            // inside any function, if, or while) is raw C meant to sit
+            // at file scope -- #include lines, struct/typedef
+            // definitions, extern globals -- not inside main(). A
+            // C_call() written *inside* a function or loop body still
+            // ends up exactly where it already did, since this only
+            // special-cases the flat top-level statement list.
+            std::vector<std::string> preambleLines;
 
             for (Node *node : program.body)
             {
@@ -653,17 +647,8 @@ namespace
                     std::map<std::string, std::string> scope =
                         buildScope(fnNode->params, fnNode->body, functionReturnTypes);
 
-                    // Return type: already resolved once in
-                    // buildFunctionReturnTypes -- the explicit annotation
-                    // if the student wrote one, otherwise inferred from
-                    // the function's own `return` statements. Reusing
-                    // that single resolution (instead of recomputing it
-                    // here) guarantees this signature always matches what
-                    // call sites elsewhere assume the function returns.
                     std::string returnType = convertTypeName(functionReturnTypes.at(fnNode->name));
 
-                    // Parameter list: built from fnNode->params for
-                    // every function, not just one named "Pow".
                     std::string params;
                     for (std::size_t i = 0; i < fnNode->params.size(); ++i)
                     {
@@ -688,6 +673,21 @@ namespace
                     funcStream << "}\n";
                     functionBlocks.push_back(funcStream.str());
                 }
+                else if (auto *topCall = dynamic_cast<CallExpression *>(node);
+                         topCall && topCall->callee == "C_top")
+                {
+                    // C_top(), unlike C_call(), always lands at file
+                    // scope above main() -- for #include directives,
+                    // struct/typedef definitions, extern globals, or
+                    // whole helper function definitions. C_call() keeps
+                    // its original meaning unchanged: it runs wherever
+                    // it's textually written, top-level or not.
+                    std::string code = astToC(node, mainScope, functionReturnTypes);
+                    if (!code.empty())
+                    {
+                        preambleLines.push_back(code);
+                    }
+                }
                 else
                 {
                     std::string lineCode = astToC(node, mainScope, functionReturnTypes);
@@ -708,6 +708,11 @@ namespace
             out << "static char* quill_dup(const char* s) {\n    size_t len = strlen(s);\n    char* out = (char*)malloc(len + 1);\n    if (!out) { return NULL; }\n    memcpy(out, s, len + 1);\n    return out;\n}\n\n";
             out << "static char* quill_itoa(long long v) {\n    char buffer[32];\n    snprintf(buffer, sizeof(buffer), \"%lld\", v);\n    return quill_dup(buffer);\n}\n\n";
             out << "static char* quill_ftoa(double v) {\n    char buffer[64];\n    snprintf(buffer, sizeof(buffer), \"%f\", v);\n    return quill_dup(buffer);\n}\n\n";
+
+            for (const std::string &line : preambleLines)
+                out << line << "\n";
+            if (!preambleLines.empty())
+                out << "\n";
 
             for (const std::string &fn : functionBlocks)
                 out << fn << "\n";
@@ -807,43 +812,40 @@ int main(int argc, char **argv)
 
     std::string source((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
 
-    Lexer lexer(source);
-    std::vector<Token> tokens = lexer.tokenize();
+    // Relative import paths inside this file resolve against its own
+    // directory, so `import "helpers.qsc";` works regardless of which
+    // directory quillc itself was invoked from.
+    std::size_t slashPos = inputPath.find_last_of('/');
+    std::string baseDir = slashPos == std::string::npos ? "" : inputPath.substr(0, slashPos);
+
     if (debug)
     {
+        Lexer debugLexer(source);
+        std::vector<Token> debugTokens = debugLexer.tokenize();
         std::cout << "=== LEXING ===\n";
-        for (std::size_t i = 0; i < tokens.size() && i < 30; ++i)
+        for (std::size_t i = 0; i < debugTokens.size() && i < 30; ++i)
         {
-            std::cout << "  [" << i << "] type=" << static_cast<int>(tokens[i].type) << " value='" << tokens[i].value << "'\n";
+            std::cout << "  [" << i << "] type=" << static_cast<int>(debugTokens[i].type) << " value='" << debugTokens[i].value << "'\n";
         }
     }
 
-    Parser parser(tokens);
-    Program program = parser.parse();
-    if (debug)
-    {
-        std::cout << "=== PARSING ===\n";
-        std::cout << "  statements: " << program.body.size() << "\n";
-    }
-
+    // Lexing, parsing, import expansion, duplicate-function checking,
+    // and type checking all happen inside transpile() now, against the
+    // fully expanded program -- see the comment on expandImports() for
+    // why that matters. Any failure at any of those stages throws, and
+    // is reported here with whatever message the failing stage attached
+    // (already prefixed appropriately, e.g. "Type error: ...").
+    Transpiler transpiler;
+    std::string cOutput;
     try
     {
-        TypeChecker checker;
-        checker.check(program);
-        if (debug)
-        {
-            std::cout << "=== TYPE CHECKING ===\n";
-            std::cout << "  type checking passed\n";
-        }
+        cOutput = transpiler.transpile(source, baseDir);
     }
     catch (const std::exception &ex)
     {
-        std::cerr << "Type error: " << ex.what() << "\n";
+        std::cerr << ex.what() << "\n";
         return 1;
     }
-
-    Transpiler transpiler;
-    std::string cOutput = transpiler.transpile(source);
 
     std::string cPath = outputPath.empty() ? replaceExtension(inputPath, ".c") : outputPath;
     if (compileC && !outputPath.empty() && outputPath.find(".c") == std::string::npos)

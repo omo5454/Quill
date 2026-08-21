@@ -117,6 +117,11 @@ private:
             return parseWhileLoop();
         }
 
+        if (peek().value == "import")
+        {
+            return parseImportStatement();
+        }
+
         if (peek().type == TokenType::Identifier)
         {
             return parseIdentifierStatement();
@@ -347,6 +352,18 @@ private:
             }
         }
 
+        return node;
+    }
+
+    Node *parseImportStatement()
+    {
+        advance(); // "import"
+
+        ImportStatement *node = new ImportStatement();
+        if (peek().type == TokenType::String)
+        {
+            node->path = advance().value;
+        }
         return node;
     }
 

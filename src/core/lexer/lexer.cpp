@@ -6,99 +6,118 @@
 
 #include "../types/types.cpp"
 
-class Lexer {
+class Lexer
+{
 public:
     explicit Lexer(std::string input) : input_(std::move(input)), pos_(0) {}
 
-    std::vector<Token> tokenize() {
+    std::vector<Token> tokenize()
+    {
         std::vector<Token> tokens;
 
-        while (pos_ < input_.size()) {
+        while (pos_ < input_.size())
+        {
             char c = input_[pos_];
 
-            if (std::isspace(static_cast<unsigned char>(c))) {
+            if (std::isspace(static_cast<unsigned char>(c)))
+            {
                 ++pos_;
                 continue;
             }
 
-            if (c == ';') {
+            if (c == ';')
+            {
                 ++pos_;
                 continue;
             }
 
-            if (c == '#') {
+            if (c == '#')
+            {
                 ++pos_;
-                while (pos_ < input_.size() && input_[pos_] != '\n') {
+                while (pos_ < input_.size() && input_[pos_] != '\n')
+                {
                     ++pos_;
                 }
                 tokens.push_back(Token{TokenType::Comment, "comment"});
                 continue;
             }
 
-            if (std::isalpha(static_cast<unsigned char>(c)) || c == '_') {
+            if (std::isalpha(static_cast<unsigned char>(c)) || c == '_')
+            {
                 tokens.push_back(readIdentifier());
                 continue;
             }
 
-            if (std::isdigit(static_cast<unsigned char>(c))) {
+            if (std::isdigit(static_cast<unsigned char>(c)))
+            {
                 tokens.push_back(readNumber());
                 continue;
             }
 
-            if (c == '"') {
+            if (c == '"')
+            {
                 tokens.push_back(readString());
                 continue;
             }
 
-            if (c == '+' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '+') {
+            if (c == '+' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '+')
+            {
                 tokens.push_back(Token{TokenType::Incrementation, "++"});
                 pos_ += 2;
                 continue;
             }
 
-            if (c == '-' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '-') {
+            if (c == '-' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '-')
+            {
                 tokens.push_back(Token{TokenType::Incrementation, "--"});
                 pos_ += 2;
                 continue;
             }
 
-            if (c == '<' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '=') {
+            if (c == '<' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '=')
+            {
                 tokens.push_back(Token{TokenType::Operator, "<="});
                 pos_ += 2;
                 continue;
             }
 
-            if (c == '>' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '=') {
+            if (c == '>' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '=')
+            {
                 tokens.push_back(Token{TokenType::Operator, ">="});
                 pos_ += 2;
                 continue;
             }
 
-            if (c == '=' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '=') {
+            if (c == '=' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '=')
+            {
                 tokens.push_back(Token{TokenType::Operator, "=="});
                 pos_ += 2;
                 continue;
             }
 
-            if (c == '!' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '=') {
+            if (c == '!' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '=')
+            {
                 tokens.push_back(Token{TokenType::Operator, "!="});
                 pos_ += 2;
                 continue;
             }
 
-            if (c == '&' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '&') {
+            if (c == '&' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '&')
+            {
                 tokens.push_back(Token{TokenType::Operator, "&&"});
                 pos_ += 2;
                 continue;
             }
 
-            if (c == '|' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '|') {
+            if (c == '|' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '|')
+            {
                 tokens.push_back(Token{TokenType::Operator, "||"});
                 pos_ += 2;
                 continue;
             }
 
-            if (c == ':' || c == ',' || c == '(' || c == ')' || c == '{' || c == '}' || c == '[' || c == ']' || c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == '>' || c == '<' || c == '!' || c == '=' || c == '&' || c == '|') {
+            if (c == ':' || c == ',' || c == '(' || c == ')' || c == '{' || c == '}' || c == '[' || c == ']' || c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == '>' || c == '<' || c == '!' || c == '=' || c == '&' || c == '|')
+            {
                 tokens.push_back(Token{TokenType::Operator, std::string(1, c)});
                 ++pos_;
                 continue;
@@ -113,31 +132,38 @@ public:
     }
 
 private:
-    Token readIdentifier() {
+    Token readIdentifier()
+    {
         size_t start = pos_;
-        while (pos_ < input_.size() && (std::isalnum(static_cast<unsigned char>(input_[pos_])) || input_[pos_] == '_')) {
+        while (pos_ < input_.size() && (std::isalnum(static_cast<unsigned char>(input_[pos_])) || input_[pos_] == '_'))
+        {
             ++pos_;
         }
 
         std::string text = input_.substr(start, pos_ - start);
         if (text == "let" || text == "mut" || text == "const" || text == "printf" || text == "say" ||
             text == "func" || text == "if" || text == "else" || text == "elif" || text == "while" ||
-            text == "return" || text == "true" || text == "false") {
+            text == "return" || text == "true" || text == "false" || text == "import")
+        {
             return Token{TokenType::Keyword, text};
         }
 
         return Token{TokenType::Identifier, text};
     }
 
-    Token readNumber() {
+    Token readNumber()
+    {
         size_t start = pos_;
-        while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
+        while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_])))
+        {
             ++pos_;
         }
 
-        if (pos_ < input_.size() && input_[pos_] == '.') {
+        if (pos_ < input_.size() && input_[pos_] == '.')
+        {
             ++pos_;
-            while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
+            while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_])))
+            {
                 ++pos_;
             }
             return Token{TokenType::Double, input_.substr(start, pos_ - start)};
@@ -146,26 +172,37 @@ private:
         return Token{TokenType::Number, input_.substr(start, pos_ - start)};
     }
 
-    Token readString() {
+    Token readString()
+    {
         ++pos_;
         std::string out;
 
-        while (pos_ < input_.size() && input_[pos_] != '"') {
-            if (input_[pos_] == '\\' && pos_ + 1 < input_.size()) {
+        while (pos_ < input_.size() && input_[pos_] != '"')
+        {
+            if (input_[pos_] == '\\' && pos_ + 1 < input_.size())
+            {
                 ++pos_;
                 char next = input_[pos_];
-                if (next == 'n') out += '\n';
-                else if (next == 't') out += '\t';
-                else if (next == '"') out += '"';
-                else if (next == '\\') out += '\\';
-                else out += next;
-            } else {
+                if (next == 'n')
+                    out += '\n';
+                else if (next == 't')
+                    out += '\t';
+                else if (next == '"')
+                    out += '"';
+                else if (next == '\\')
+                    out += '\\';
+                else
+                    out += next;
+            }
+            else
+            {
                 out += input_[pos_];
             }
             ++pos_;
         }
 
-        if (pos_ < input_.size() && input_[pos_] == '"') {
+        if (pos_ < input_.size() && input_[pos_] == '"')
+        {
             ++pos_;
         }
 
