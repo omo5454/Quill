@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 #include <string>
+#include <map>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -10,7 +11,15 @@
 
 class TypeChecker {
 public:
-    void check(const Program& program) {
+    // functionReturnTypes is the transpiler's own already-resolved map
+    // of function name -> return type (explicit annotation, or
+    // inferred from the function's own return statements when one
+    // wasn't given) -- see buildFunctionReturnTypes() in trans.cpp.
+    // Reusing it here means this checker and the code actually emitted
+    // by the transpiler can never disagree about what a function
+    // returns.
+    void check(const Program& program, const std::map<std::string, std::string>& functionReturnTypes) {
+        this->functionReturnTypes = functionReturnTypes;
         for (Node* stmt : program.body) {
             checkNode(stmt);
         }
@@ -18,6 +27,7 @@ public:
 
 private:
     std::unordered_map<std::string, std::string> symbols;
+    std::map<std::string, std::string> functionReturnTypes;
 
     void checkNode(Node* node) {
         if (!node) return;
@@ -194,7 +204,10 @@ private:
             return inferType(unary->operand);
         }
 
-        if (dynamic_cast<CallExpression*>(node)) return "unknown";
+        if (auto* call = dynamic_cast<CallExpression*>(node)) {
+            auto it = functionReturnTypes.find(call->callee);
+            return it != functionReturnTypes.end() ? it->second : "unknown";
+        }
         if (dynamic_cast<Assignment*>(node)) return "void";
 
         return "unknown";

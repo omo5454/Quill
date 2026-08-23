@@ -97,6 +97,17 @@ private:
             return parseFunctionDeclaration();
         }
 
+        if (peek().value == "extern")
+        {
+            advance(); // "extern"
+            Node *node = parseFunctionDeclaration();
+            if (auto *fn = dynamic_cast<Function *>(node))
+            {
+                fn->isExtern = true;
+            }
+            return node;
+        }
+
         if (peek().value == "printf" || peek().value == "say")
         {
             return parsePrintStatement();

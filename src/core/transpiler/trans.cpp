@@ -608,6 +608,13 @@ namespace
             program = expandImports(program, baseDir, inProgress);
             checkForDuplicateFunctions(program);
 
+            // Built before type-checking runs (not after, as before) so
+            // the checker can be handed the transpiler's own, already-
+            // correct notion of each function's return type -- both
+            // explicitly annotated and inferred -- instead of
+            // maintaining a second, weaker copy of that logic.
+            std::map<std::string, std::string> functionReturnTypes = buildFunctionReturnTypes(program);
+
             // Type-checking runs on the *expanded* program -- otherwise
             // anything defined only in an imported file would never be
             // checked at all, since the checker would just see an
@@ -615,14 +622,13 @@ namespace
             try
             {
                 TypeChecker checker;
-                checker.check(program);
+                checker.check(program, functionReturnTypes);
             }
             catch (const std::exception &ex)
             {
                 throw std::runtime_error("Type error: " + std::string(ex.what()));
             }
 
-            std::map<std::string, std::string> functionReturnTypes = buildFunctionReturnTypes(program);
             std::map<std::string, std::string> mainScope = buildScope({}, program.body, functionReturnTypes);
 
             std::vector<std::string> functionBlocks;
@@ -644,6 +650,19 @@ namespace
 
                 if (auto *fnNode = dynamic_cast<Function *>(node))
                 {
+                    // extern functions are signature-only -- the real
+                    // implementation is whatever library the student
+                    // linked (already declared via a C_top() #include).
+                    // Nothing to emit here; buildFunctionReturnTypes()
+                    // already picked up its return type from
+                    // fnNode->returnType regardless of isExtern, so
+                    // calls to it are still typed correctly everywhere
+                    // else in the file.
+                    if (fnNode->isExtern)
+                    {
+                        continue;
+                    }
+
                     std::map<std::string, std::string> scope =
                         buildScope(fnNode->params, fnNode->body, functionReturnTypes);
 
