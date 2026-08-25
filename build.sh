@@ -29,7 +29,7 @@ build_cpp_binary() {
     local label="$3"
 
     echo "Building $label..."
-    if [[$TARGET == "linux" ]]; then
+    if [[ "$TARGET" == "linux" ]]; then
         g++ -std=c++17 "$src" -O2 -o "$BIN_DIR/$out"
     else
         g++ -std=c++17 "$src" -O2 -o "$BIN_DIR/quill-linux"
@@ -77,7 +77,7 @@ fi
 mkdir -p "$BIN_DIR"
 print_header "Quill C++ Build v$VERSION"
 
-case "${TARGET,,}" in
+case "$(echo "$TARGET" | tr '[:upper:]' '[:lower:]')" in
     linux)
         build_cpp_binary "src/core/transpiler/trans.cpp" "quill-linux" "transpiler" || exit 1
         ;;
