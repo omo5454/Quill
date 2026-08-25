@@ -198,39 +198,65 @@ namespace
         return scope;
     }
 
+    // Combines two return-site types the same way binary-expression
+    // codegen already promotes mixed arithmetic: number+double ->
+    // double (the more general of the two). A genuinely incompatible
+    // pair (e.g. number and string) keeps whichever was found first --
+    // Quill's typechecker doesn't cross-check return-path consistency,
+    // so this stays lenient rather than introducing a new hard error
+    // class here.
+    std::string combineReturnTypes(const std::string &a, const std::string &b)
+    {
+        if (a == "void")
+            return b;
+        if (b == "void")
+            return a;
+        if (a == b)
+            return a;
+        if ((a == "number" && b == "double") || (a == "double" && b == "number"))
+            return "double";
+        return a;
+    }
+
+    // Walks *every* return statement reachable in this function body --
+    // not just the first one found -- since an early bail-out of a
+    // different numeric type (e.g. `return 0;` inside a safety-valve
+    // check partway through a function that mainly `return`s a
+    // double) must not be allowed to decide the whole function's
+    // return type just because it happens to be visited first.
     std::string inferFunctionReturnType(const std::vector<Node *> &body,
                                         const std::map<std::string, std::string> &scope,
                                         const std::map<std::string, std::string> &functionReturnTypes)
     {
+        std::string found = "void";
         for (Node *node : body)
         {
             if (!node)
                 continue;
 
+            std::string candidate = "void";
+
             if (auto *ret = dynamic_cast<ReturnStatement *>(node))
             {
                 if (ret->value)
                 {
-                    return inferNodeType(ret->value, scope, functionReturnTypes);
+                    candidate = inferNodeType(ret->value, scope, functionReturnTypes);
                 }
             }
             else if (auto *ifStmt = dynamic_cast<IfStatement *>(node))
             {
                 std::string fromConsequent = inferFunctionReturnType(ifStmt->consequent, scope, functionReturnTypes);
-                if (fromConsequent != "void")
-                    return fromConsequent;
                 std::string fromAlternate = inferFunctionReturnType(ifStmt->alternate, scope, functionReturnTypes);
-                if (fromAlternate != "void")
-                    return fromAlternate;
+                candidate = combineReturnTypes(fromConsequent, fromAlternate);
             }
             else if (auto *loop = dynamic_cast<WhileLoop *>(node))
             {
-                std::string fromLoop = inferFunctionReturnType(loop->body, scope, functionReturnTypes);
-                if (fromLoop != "void")
-                    return fromLoop;
+                candidate = inferFunctionReturnType(loop->body, scope, functionReturnTypes);
             }
+
+            found = combineReturnTypes(found, candidate);
         }
-        return "void";
+        return found;
     }
 
     std::map<std::string, std::string> buildFunctionReturnTypes(const Program &program)
@@ -449,14 +475,14 @@ namespace
             else if ((name == "C_call" || name == "C_top") && argCodes.size() == 1)
             {
 
-                std::string& targetStr = argCodes[0];
+                std::string &targetStr = argCodes[0];
 
-
-                if (targetStr.size() >= 2 && targetStr.front() == '"' && targetStr.back() == '"') {
+                if (targetStr.size() >= 2 && targetStr.front() == '"' && targetStr.back() == '"')
+                {
                     targetStr = targetStr.substr(1, targetStr.size() - 2);
                 }
 
-                std::string arg = { targetStr };
+                std::string arg = {targetStr};
                 return "" + arg + "";
             }
             else if (name == "input" && argCodes.size() == 1)
@@ -542,10 +568,10 @@ namespace
                 if (!importFile.is_open())
                 {
                     throw std::runtime_error("could not open imported file: " + resolvedPath +
-                                              " (imported as \"" + imp->path + "\")");
+                                             " (imported as \"" + imp->path + "\")");
                 }
                 std::string importedSource((std::istreambuf_iterator<char>(importFile)),
-                                            std::istreambuf_iterator<char>());
+                                           std::istreambuf_iterator<char>());
 
                 Lexer importLexer(importedSource);
                 std::vector<Token> importTokens = importLexer.tokenize();

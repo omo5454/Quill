@@ -6,7 +6,7 @@ TARGET="linux"
 CLEAN=false
 
 BIN_DIR="bin"
-VERSION="2.2.3"
+VERSION="2.3.0"
 
 print_header() {
     echo

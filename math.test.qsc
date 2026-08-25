@@ -1,0 +1,21 @@
+# math.qsc test file tests math functions included in stdlib/math 
+
+import "../stdlib/math.qsc";
+C_top("#include <math.h>");
+let x: double = 4.3;
+let y: double = 4.0;
+
+printf(copysign_quill(5, -8));
+printf(abs_quill(-9));
+printf(floor_quill(6.800000));
+printf(ceil_quill(4.3));
+printf(int_ceil_quill(18, 3));
+printf(sqrt_quill(17));
+printf(pow_quill(8.0, 2));
+printf(cubrt_quill(5.0));
+printf(exp_quill(8.0));
+printf(trunc_quill(8.647547));
+printf(round_quill(5.4));
+printf(hypot_quill(6, 7));
+printf(is_inf(x));
+printf(is_nan(y));

@@ -140,6 +140,15 @@ private:
         }
     }
 
+    // C_call()/C_top() splice raw, unverifiable C text -- Quill has no
+    // way to know their real type, so (the same trust model as `extern
+    // func`) the student's own annotation is trusted rather than
+    // checked against a guess that can only ever be wrong.
+    bool isRawCSplice(Node* node) {
+        auto* call = dynamic_cast<CallExpression*>(node);
+        return call && (call->callee == "C_call" || call->callee == "C_top");
+    }
+
     void checkVariableDeclaration(VariableDeclaration* decl) {
         if (!decl->value) {
             // Arrays (and any other declaration without an initializer)
@@ -151,6 +160,11 @@ private:
             return;
         }
         checkNode(decl->value);
+
+        if (isRawCSplice(decl->value)) {
+            symbols[decl->identifier] = decl->declaredType.empty() ? "unknown" : decl->declaredType;
+            return;
+        }
 
         std::string valueType = inferType(decl->value);
         if (!decl->declaredType.empty() && decl->declaredType != valueType) {
@@ -167,6 +181,10 @@ private:
 
         if (!assign->value) return;
         checkNode(assign->value);
+
+        if (isRawCSplice(assign->value)) {
+            return;
+        }
 
         std::string valueType = inferType(assign->value);
         if (valueType != it->second) {
