@@ -623,7 +623,7 @@ namespace
     class Transpiler
     {
     public:
-        std::string transpile(const std::string &source, const std::string &baseDir)
+        std::string transpile(const std::string &source, const std::string &baseDir, const bool typeCheck)
         {
             Lexer lexer(source);
             std::vector<Token> tokens = lexer.tokenize();
@@ -645,14 +645,17 @@ namespace
             // anything defined only in an imported file would never be
             // checked at all, since the checker would just see an
             // ImportStatement it doesn't know how to interpret.
-            try
+            if (typeCheck)
             {
-                TypeChecker checker;
-                checker.check(program, functionReturnTypes);
-            }
-            catch (const std::exception &ex)
-            {
-                throw std::runtime_error("Type error: " + std::string(ex.what()));
+                try
+                {
+                    TypeChecker checker;
+                    checker.check(program, functionReturnTypes);
+                }
+                catch (const std::exception &ex)
+                {
+                    throw std::runtime_error("Type error: " + std::string(ex.what()));
+                }
             }
 
             std::map<std::string, std::string> mainScope = buildScope({}, program.body, functionReturnTypes);
@@ -712,6 +715,10 @@ namespace
                         std::string stmtCode = astToC(bodyStmt, scope, functionReturnTypes);
                         if (!stmtCode.empty())
                         {
+                            if (stmtCode.back() != ';' && stmtCode.back() != '}')
+                            {
+                                stmtCode += ";";
+                            }
                             funcStream << "    " << stmtCode << "\n";
                         }
                     }
@@ -788,6 +795,7 @@ int main(int argc, char **argv)
     bool interpret = false;
     bool transpileMode = false;
     bool compileC = false;
+    bool typeCheck = false;
     std::string outputPath;
     std::vector<std::string> args;
 
@@ -814,6 +822,10 @@ int main(int argc, char **argv)
         {
             compileC = true;
         }
+        else if (arg == "-tc" || arg == "--typeCheck")
+        {
+            typeCheck = true;
+        }
         else if (arg == "-o" || arg == "--output")
         {
             if (i + 1 >= argc)
@@ -831,7 +843,7 @@ int main(int argc, char **argv)
 
     if (version)
     {
-        std::cout << "Quill version: 2.2.3\n";
+        std::cout << "Quill version: 2.4.2\n";
         return 0;
     }
 
@@ -884,7 +896,7 @@ int main(int argc, char **argv)
     std::string cOutput;
     try
     {
-        cOutput = transpiler.transpile(source, baseDir);
+        cOutput = transpiler.transpile(source, baseDir, typeCheck);
     }
     catch (const std::exception &ex)
     {

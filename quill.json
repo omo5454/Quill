@@ -1,8 +1,0 @@
-{
-  "name": "Quill",
-  "version": "0.1.0",
-  "main": "main.qsc",
-  "deps": {
-    "omrimorgan5-hub/test-quill": "github:omrimorgan5-hub/test-quill#latest"
-  }
-}

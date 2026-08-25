@@ -121,7 +121,7 @@ private:
 
         std::string text = input_.substr(start, pos_ - start);
         if (text == "let" || text == "mut" || text == "const" || text == "printf" || text == "say" ||
-            text == "func" || text == "if" || text == "else" || text == "elif" || text == "while" ||
+            text == "func" || text == "fn" || text == "if" || text == "else" || text == "elif" || text == "while" ||
             text == "return" || text == "true" || text == "false" || text == "import" || text == "extern") {
             return Token{TokenType::Keyword, text};
         }

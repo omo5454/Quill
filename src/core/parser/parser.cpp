@@ -92,7 +92,7 @@ private:
             return parseVariableDeclaration();
         }
 
-        if (peek().value == "func")
+        if (peek().value == "func" || peek().value == "fn")
         {
             return parseFunctionDeclaration();
         }
