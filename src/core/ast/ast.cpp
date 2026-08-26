@@ -107,6 +107,11 @@ struct IndexAssignment : Node {
     Node* value = nullptr;
 };
 
+// Fixed or dynamic array literal: [1, 2, 3] / ["a", "b"] / []
+struct ArrayLiteral : Node {
+    std::vector<Node*> elements;
+};
+
 struct Assignment : Node {
     std::string identifier;
     Node* value = nullptr;

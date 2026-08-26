@@ -164,24 +164,32 @@ private:
             advance();
             type = advance().value;
 
-            // Array type: `number[200]` -- a fixed size, given as a
-            // literal, folded straight into the type string ("number[200]")
-            // so nothing else needs a new AST field for it.
+            // Array types:
+            //   number[200]  -- fixed size
+            //   number[]     -- dynamic (growable) array
             if (peek().value == "[")
             {
                 advance();
-                std::string sizeTok = advance().value;
-                type += "[" + sizeTok + "]";
                 if (peek().value == "]")
                 {
                     advance();
+                    type += "[]";
+                }
+                else
+                {
+                    std::string sizeTok = advance().value;
+                    type += "[" + sizeTok + "]";
+                    if (peek().value == "]")
+                    {
+                        advance();
+                    }
                 }
             }
         }
 
-        // Arrays are declared with a fixed size and no initializer --
-        // `let nums: number[5];` -- so only parse a value if `=` was
-        // actually written.
+        // Arrays may be declared without an initializer
+        // (`let nums: number[5];` / `let xs: number[];`) or with one
+        // (`let xs: number[] = [1, 2, 3];`).
         Node *value = nullptr;
         if (peek().value == "=")
         {
@@ -637,6 +645,26 @@ private:
                 advance();
             }
             return inner;
+        }
+
+        // Array literal: [1, 2, 3] or []
+        if (peek().value == "[")
+        {
+            advance();
+            ArrayLiteral *lit = new ArrayLiteral();
+            while (!isAtEnd() && peek().value != "]")
+            {
+                lit->elements.push_back(parseExpression());
+                if (peek().value == ",")
+                {
+                    advance();
+                }
+            }
+            if (peek().value == "]")
+            {
+                advance();
+            }
+            return lit;
         }
 
         if (peek().type == TokenType::Operator && (peek().value == "!" || peek().value == "-"))

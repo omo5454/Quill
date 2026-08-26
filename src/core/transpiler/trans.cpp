@@ -68,6 +68,46 @@ namespace
         return "number";
     }
 
+    // --- array type helpers -------------------------------------------------
+    // "number[5]"  -> fixed, size 5
+    // "number[]"   -> dynamic
+    bool isArrayTypeName(const std::string &t)
+    {
+        return t.find('[') != std::string::npos;
+    }
+    bool isDynamicArrayType(const std::string &t)
+    {
+        return t.size() >= 2 && t.find("[]") != std::string::npos;
+    }
+    std::string arrayElemType(const std::string &t)
+    {
+        auto b = t.find('[');
+        if (b == std::string::npos)
+            return t;
+        return t.substr(0, b);
+    }
+    // C struct name for a dynamic array of element type
+    std::string dynArrCType(const std::string &elem)
+    {
+        if (elem == "double")
+            return "quill_arr_double";
+        if (elem == "bool")
+            return "quill_arr_bool";
+        if (elem == "string")
+            return "quill_arr_str";
+        return "quill_arr_int"; // number
+    }
+    std::string dynArrPrefix(const std::string &elem)
+    {
+        if (elem == "double")
+            return "quill_arr_double";
+        if (elem == "bool")
+            return "quill_arr_bool";
+        if (elem == "string")
+            return "quill_arr_str";
+        return "quill_arr_int";
+    }
+
     std::string inferNodeType(Node *node,
                               const std::map<std::string, std::string> &scope,
                               const std::map<std::string, std::string> &functionReturnTypes)
@@ -105,6 +145,25 @@ namespace
                 return objType.substr(0, bracketPos);
             }
             return "number";
+        }
+
+        if (auto *lit = dynamic_cast<ArrayLiteral *>(node))
+        {
+            if (lit->elements.empty())
+                return "number[]";
+            std::string elem = inferNodeType(lit->elements[0], scope, functionReturnTypes);
+            for (size_t i = 1; i < lit->elements.size(); ++i)
+            {
+                std::string t = inferNodeType(lit->elements[i], scope, functionReturnTypes);
+                if (t != elem)
+                {
+                    if ((elem == "number" && t == "double") || (elem == "double" && t == "number"))
+                        elem = "double";
+                    else
+                        return "unknown";
+                }
+            }
+            return elem + "[]";
         }
 
         if (auto *bin = dynamic_cast<BinaryExpression *>(node))
@@ -264,6 +323,8 @@ namespace
         std::map<std::string, std::string> types;
         types["len"] = "number";
         types["toString"] = "string";
+        types["push"] = "void";
+        types["pop"] = "number"; // element type approximated; real type depends on array
 
         for (Node *node : program.body)
         {
@@ -314,11 +375,55 @@ namespace
             auto it = scope.find(decl->identifier);
             std::string typeName = it != scope.end() ? it->second : "number";
 
+            // Dynamic array: number[] / double[] / ...
+            if (isDynamicArrayType(typeName))
+            {
+                std::string elem = arrayElemType(typeName);
+                std::string ctype = dynArrCType(elem);
+                std::string pref = dynArrPrefix(elem);
+                if (auto *lit = dynamic_cast<ArrayLiteral *>(decl->value))
+                {
+                    std::ostringstream init;
+                    init << ctype << " " << decl->identifier << " = " << pref << "_new();\n";
+                    for (Node *el : lit->elements)
+                    {
+                        init << "    " << pref << "_push(&" << decl->identifier << ", "
+                             << astToC(el, scope, functionReturnTypes) << ");\n";
+                    }
+                    std::string s = init.str();
+                    // last extra newline handled by caller
+                    if (!s.empty() && s.back() == '\n')
+                        s.pop_back();
+                    return s;
+                }
+                if (decl->value)
+                {
+                    return ctype + " " + decl->identifier + " = " +
+                           astToC(decl->value, scope, functionReturnTypes) + ";";
+                }
+                return ctype + " " + decl->identifier + " = " + pref + "_new();";
+            }
+
+            // Fixed-size array: number[5]
             auto bracketPos = typeName.find('[');
             if (bracketPos != std::string::npos)
             {
                 std::string baseType = typeName.substr(0, bracketPos);
                 std::string sizePart = typeName.substr(bracketPos);
+                if (auto *lit = dynamic_cast<ArrayLiteral *>(decl->value))
+                {
+                    std::ostringstream init;
+                    init << "{";
+                    for (size_t i = 0; i < lit->elements.size(); ++i)
+                    {
+                        if (i)
+                            init << ", ";
+                        init << astToC(lit->elements[i], scope, functionReturnTypes);
+                    }
+                    init << "}";
+                    return convertTypeName(baseType) + " " + decl->identifier + sizePart +
+                           " = " + init.str() + ";";
+                }
                 return convertTypeName(baseType) + " " + decl->identifier + sizePart + ";";
             }
 
@@ -334,9 +439,16 @@ namespace
 
         if (auto *idxAssign = dynamic_cast<IndexAssignment *>(node))
         {
-            return astToC(idxAssign->object, scope, functionReturnTypes) + "[" +
-                   astToC(idxAssign->index, scope, functionReturnTypes) + "] = " +
-                   astToC(idxAssign->value, scope, functionReturnTypes) + ";";
+            std::string objCode = astToC(idxAssign->object, scope, functionReturnTypes);
+            std::string idxCode = astToC(idxAssign->index, scope, functionReturnTypes);
+            std::string valCode = astToC(idxAssign->value, scope, functionReturnTypes);
+            std::string objType = inferNodeType(idxAssign->object, scope, functionReturnTypes);
+            if (isDynamicArrayType(objType))
+            {
+                std::string pref = dynArrPrefix(arrayElemType(objType));
+                return pref + "_set(&" + objCode + ", " + idxCode + ", " + valCode + ");";
+            }
+            return objCode + "[" + idxCode + "] = " + valCode + ";";
         }
 
         if (auto *bin = dynamic_cast<BinaryExpression *>(node))
@@ -374,8 +486,27 @@ namespace
 
         if (auto *idx = dynamic_cast<IndexExpression *>(node))
         {
-            return astToC(idx->object, scope, functionReturnTypes) + "[" +
-                   astToC(idx->index, scope, functionReturnTypes) + "]";
+            std::string objCode = astToC(idx->object, scope, functionReturnTypes);
+            std::string idxCode = astToC(idx->index, scope, functionReturnTypes);
+            std::string objType = inferNodeType(idx->object, scope, functionReturnTypes);
+            if (isDynamicArrayType(objType))
+            {
+                std::string pref = dynArrPrefix(arrayElemType(objType));
+                return pref + "_get(&" + objCode + ", " + idxCode + ")";
+            }
+            return objCode + "[" + idxCode + "]";
+        }
+
+        if (auto *lit = dynamic_cast<ArrayLiteral *>(node))
+        {
+            // Bare array literal as expression -> temporary dynamic array
+            std::string elem = "number";
+            if (!lit->elements.empty())
+                elem = inferNodeType(lit->elements[0], scope, functionReturnTypes);
+            std::string pref = dynArrPrefix(elem);
+            // Not ideal as expression; prefer used only as initializer.
+            // Emit a compound that creates a temp — callers should use decl form.
+            return pref + "_new() /* array literal used as expression; prefer initializer */";
         }
 
         if (auto *print = dynamic_cast<PrintStatement *>(node))
@@ -470,7 +601,34 @@ namespace
             }
             else if (name == "len" && argCodes.size() == 1)
             {
+                std::string t = argTypes[0];
+                if (isDynamicArrayType(t))
+                {
+                    std::string pref = dynArrPrefix(arrayElemType(t));
+                    return pref + "_len(&" + argCodes[0] + ")";
+                }
+                if (isArrayTypeName(t) && !isDynamicArrayType(t))
+                {
+                    // fixed-size: sizeof(a)/sizeof(a[0])
+                    return "(int)(sizeof(" + argCodes[0] + ") / sizeof((" + argCodes[0] + ")[0]))";
+                }
                 return "(int)strlen(" + argCodes[0] + ")";
+            }
+            else if (name == "push" && argCodes.size() == 2)
+            {
+                std::string t = argTypes[0];
+                if (!isDynamicArrayType(t))
+                    return "/* push requires dynamic array */ 0";
+                std::string pref = dynArrPrefix(arrayElemType(t));
+                return pref + "_push(&" + argCodes[0] + ", " + argCodes[1] + ")";
+            }
+            else if (name == "pop" && argCodes.size() == 1)
+            {
+                std::string t = argTypes[0];
+                if (!isDynamicArrayType(t))
+                    return "/* pop requires dynamic array */ 0";
+                std::string pref = dynArrPrefix(arrayElemType(t));
+                return pref + "_pop(&" + argCodes[0] + ")";
             }
             else if ((name == "C_call" || name == "C_top") && argCodes.size() == 1)
             {
@@ -760,6 +918,119 @@ namespace
             out << "static char* quill_dup(const char* s) {\n    size_t len = strlen(s);\n    char* out = (char*)malloc(len + 1);\n    if (!out) { return NULL; }\n    memcpy(out, s, len + 1);\n    return out;\n}\n\n";
             out << "static char* quill_itoa(long long v) {\n    char buffer[32];\n    snprintf(buffer, sizeof(buffer), \"%lld\", v);\n    return quill_dup(buffer);\n}\n\n";
             out << "static char* quill_ftoa(double v) {\n    char buffer[64];\n    snprintf(buffer, sizeof(buffer), \"%f\", v);\n    return quill_dup(buffer);\n}\n\n";
+
+            out << R"QUILL_ARR(
+            typedef struct { int *data; int length; int capacity; } quill_arr_int;
+            typedef struct { double *data; int length; int capacity; } quill_arr_double;
+            typedef struct { bool *data; int length; int capacity; } quill_arr_bool;
+            typedef struct { const char **data; int length; int capacity; } quill_arr_str;
+
+            static quill_arr_int quill_arr_int_new(void) {
+                quill_arr_int a; a.data = NULL; a.length = 0; a.capacity = 0; return a;
+            }
+            static quill_arr_double quill_arr_double_new(void) {
+                quill_arr_double a; a.data = NULL; a.length = 0; a.capacity = 0; return a;
+            }
+            static quill_arr_bool quill_arr_bool_new(void) {
+                quill_arr_bool a; a.data = NULL; a.length = 0; a.capacity = 0; return a;
+            }
+            static quill_arr_str quill_arr_str_new(void) {
+                quill_arr_str a; a.data = NULL; a.length = 0; a.capacity = 0; return a;
+            }
+
+            static void quill_arr_int_push(quill_arr_int *a, int v) {
+                if (a->length >= a->capacity) {
+                    int nc = a->capacity == 0 ? 8 : a->capacity * 2;
+                    int *nd = (int*)realloc(a->data, (size_t)nc * sizeof(int));
+                    if (!nd) return;
+                    a->data = nd; a->capacity = nc;
+                }
+                a->data[a->length++] = v;
+            }
+            static void quill_arr_double_push(quill_arr_double *a, double v) {
+                if (a->length >= a->capacity) {
+                    int nc = a->capacity == 0 ? 8 : a->capacity * 2;
+                    double *nd = (double*)realloc(a->data, (size_t)nc * sizeof(double));
+                    if (!nd) return;
+                    a->data = nd; a->capacity = nc;
+                }
+                a->data[a->length++] = v;
+            }
+            static void quill_arr_bool_push(quill_arr_bool *a, bool v) {
+                if (a->length >= a->capacity) {
+                    int nc = a->capacity == 0 ? 8 : a->capacity * 2;
+                    bool *nd = (bool*)realloc(a->data, (size_t)nc * sizeof(bool));
+                    if (!nd) return;
+                    a->data = nd; a->capacity = nc;
+                }
+                a->data[a->length++] = v;
+            }
+            static void quill_arr_str_push(quill_arr_str *a, const char *v) {
+                if (a->length >= a->capacity) {
+                    int nc = a->capacity == 0 ? 8 : a->capacity * 2;
+                    const char **nd = (const char**)realloc(a->data, (size_t)nc * sizeof(const char*));
+                    if (!nd) return;
+                    a->data = nd; a->capacity = nc;
+                }
+                a->data[a->length++] = v;
+            }
+
+            static int quill_arr_int_get(quill_arr_int *a, int i) {
+                if (i < 0 || i >= a->length) return 0;
+                return a->data[i];
+            }
+            static double quill_arr_double_get(quill_arr_double *a, int i) {
+                if (i < 0 || i >= a->length) return 0.0;
+                return a->data[i];
+            }
+            static bool quill_arr_bool_get(quill_arr_bool *a, int i) {
+                if (i < 0 || i >= a->length) return false;
+                return a->data[i];
+            }
+            static const char *quill_arr_str_get(quill_arr_str *a, int i) {
+                if (i < 0 || i >= a->length) return "";
+                return a->data[i] ? a->data[i] : "";
+            }
+
+            static void quill_arr_int_set(quill_arr_int *a, int i, int v) {
+                if (i < 0 || i >= a->length) return;
+                a->data[i] = v;
+            }
+            static void quill_arr_double_set(quill_arr_double *a, int i, double v) {
+                if (i < 0 || i >= a->length) return;
+                a->data[i] = v;
+            }
+            static void quill_arr_bool_set(quill_arr_bool *a, int i, bool v) {
+                if (i < 0 || i >= a->length) return;
+                a->data[i] = v;
+            }
+            static void quill_arr_str_set(quill_arr_str *a, int i, const char *v) {
+                if (i < 0 || i >= a->length) return;
+                a->data[i] = v;
+            }
+
+            static int quill_arr_int_len(quill_arr_int *a) { return a->length; }
+            static int quill_arr_double_len(quill_arr_double *a) { return a->length; }
+            static int quill_arr_bool_len(quill_arr_bool *a) { return a->length; }
+            static int quill_arr_str_len(quill_arr_str *a) { return a->length; }
+
+            static int quill_arr_int_pop(quill_arr_int *a) {
+                if (a->length <= 0) return 0;
+                return a->data[--a->length];
+            }
+            static double quill_arr_double_pop(quill_arr_double *a) {
+                if (a->length <= 0) return 0.0;
+                return a->data[--a->length];
+            }
+            static bool quill_arr_bool_pop(quill_arr_bool *a) {
+                if (a->length <= 0) return false;
+                return a->data[--a->length];
+            }
+            static const char *quill_arr_str_pop(quill_arr_str *a) {
+                if (a->length <= 0) return "";
+                return a->data[--a->length];
+            }
+            )QUILL_ARR";
 
             for (const std::string &line : preambleLines)
                 out << line << "\n";

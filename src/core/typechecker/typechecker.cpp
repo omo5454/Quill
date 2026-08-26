@@ -132,6 +132,14 @@ private:
             return;
         }
 
+
+        if (auto* lit = dynamic_cast<ArrayLiteral*>(node)) {
+            for (Node* el : lit->elements) {
+                checkNode(el);
+            }
+            return;
+        }
+
         if (auto* ident = dynamic_cast<Identifier*>(node)) {
             if (symbols.find(ident->name) == symbols.end()) {
                 throw std::runtime_error("undefined identifier: " + ident->name);
@@ -167,10 +175,25 @@ private:
         }
 
         std::string valueType = inferType(decl->value);
-        if (!decl->declaredType.empty() && decl->declaredType != valueType) {
-            throw std::runtime_error("type mismatch for variable: " + decl->identifier);
+        if (!decl->declaredType.empty()) {
+            // Fixed number[3] may be initialized from number[] literal of length 3
+            // Dynamic number[] matches number[] literal
+            bool declArr = decl->declaredType.find('[') != std::string::npos;
+            bool valArr = valueType.find('[') != std::string::npos;
+            if (declArr && valArr) {
+                std::string declElem = decl->declaredType.substr(0, decl->declaredType.find('['));
+                std::string valElem = valueType.substr(0, valueType.find('['));
+                if (declElem != valElem) {
+                    throw std::runtime_error("type mismatch for variable: " + decl->identifier);
+                }
+                // length check for fixed-size left to runtime / optional later
+            } else if (decl->declaredType != valueType) {
+                throw std::runtime_error("type mismatch for variable: " + decl->identifier);
+            }
+            symbols[decl->identifier] = decl->declaredType;
+        } else {
+            symbols[decl->identifier] = valueType;
         }
-        symbols[decl->identifier] = (decl->declaredType.empty() ? valueType : decl->declaredType);
     }
 
     void checkAssignment(Assignment* assign) {
@@ -206,9 +229,33 @@ private:
             return "unknown";
         }
 
-        // Indexing a str with [] yields a character, represented the
-        // same way C represents char: as a small int.
-        if (dynamic_cast<IndexExpression*>(node)) return "number";
+        // Indexing: string -> char code (number); T[N]/T[] -> T
+        if (auto* idx = dynamic_cast<IndexExpression*>(node)) {
+            std::string objType = inferType(idx->object);
+            auto bracketPos = objType.find('[');
+            if (bracketPos != std::string::npos)
+                return objType.substr(0, bracketPos);
+            if (objType == "string")
+                return "number";
+            return "number";
+        }
+
+        if (auto* lit = dynamic_cast<ArrayLiteral*>(node)) {
+            if (lit->elements.empty())
+                return "number[]"; // default empty literal
+            std::string elem = inferType(lit->elements[0]);
+            for (size_t i = 1; i < lit->elements.size(); i++) {
+                std::string t = inferType(lit->elements[i]);
+                if (t != elem) {
+                    // allow number/double promotion inside literals
+                    if ((elem == "number" && t == "double") || (elem == "double" && t == "number"))
+                        elem = "double";
+                    else
+                        return "unknown";
+                }
+            }
+            return elem + "[]";
+        }
 
         if (auto* binary = dynamic_cast<BinaryExpression*>(node)) {
             std::string left = inferType(binary->left);
