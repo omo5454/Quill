@@ -19,3 +19,7 @@ tests/.tmp/
 .DS_Store
 Thumbs.db
 extension
+
+# testing
+quill.json
+modules
