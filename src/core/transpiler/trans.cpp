@@ -856,12 +856,12 @@ namespace
                 if (argTypes[0] == "string")
                     return "// string type not supported on input.";
                 if (argTypes[0] == "number")
-                    return "scanf(\"%d\", &" + argCodes[0] + ")";
+                    return "scanf(\"%d\", &" + argCodes[0] + ");";
 
                 if (argTypes[0] == "double")
-                    return "scanf(\"%lf\", &" + argCodes[0] + ")";
+                    return "scanf(\"%lf\", &" + argCodes[0] + ");";
 
-                return "scanf(\"%d\", &" + argCodes[0] + ")";
+                return "scanf(\"%d\", &" + argCodes[0] + ");";
             }
             else if (name == "toString" && argCodes.size() == 1)
             {
