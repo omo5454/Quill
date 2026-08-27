@@ -877,7 +877,7 @@ namespace
                 if (argTypes[0] == "string")
                     return "// string type not supported on input.";
                 if (argTypes[0] == "char")
-                    return "getchar();";
+                    return "" + argCodes[0] + " = getchar();";
                 if (argTypes[0] == "number")
                     return "scanf(\"%d\", &" + argCodes[0] + ");";
 
