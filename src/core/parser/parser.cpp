@@ -862,6 +862,18 @@ private:
             return val;
         }
 
+        if (peek().type == TokenType::Char)
+        {
+            Token tok = advance();
+            LiteralChar *val = new LiteralChar();
+            if (tok.value.empty()) {
+                val->value = '\0';          // better than '0'
+            } else {
+                val->value = static_cast<unsigned char>(tok.value[0]);
+            }
+            return val;
+        }
+
         if (peek().value == "true" || peek().value == "false")
         {
             LiteralBool *val = new LiteralBool();
