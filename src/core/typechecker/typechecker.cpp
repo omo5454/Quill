@@ -20,7 +20,7 @@ public:
     // returns.
     void check(const Program& program, const std::map<std::string, std::string>& functionReturnTypes) {
         this->functionReturnTypes = functionReturnTypes;
-        for (Node* stmt : program.body) {
+        for (::Node* stmt : program.body) {
             checkNode(stmt);
         }
     }
@@ -30,7 +30,7 @@ private:
     std::map<std::string, std::string> functionReturnTypes;
     std::map<std::string, std::map<std::string, std::string>> structFields;
 
-    void checkNode(Node* node) {
+    void checkNode(::Node* node) {
         if (!node) return;
 
         if (auto* decl = dynamic_cast<VariableDeclaration*>(node)) {
@@ -54,7 +54,7 @@ private:
                 symbols[param.name] = param.type;
             }
 
-            for (Node* stmt : fn->body) {
+            for (::Node* stmt : fn->body) {
                 checkNode(stmt);
             }
 
@@ -64,14 +64,14 @@ private:
 
         if (auto* ifStmt = dynamic_cast<IfStatement*>(node)) {
             checkNode(ifStmt->condition);
-            for (Node* stmt : ifStmt->consequent) checkNode(stmt);
-            for (Node* stmt : ifStmt->alternate) checkNode(stmt);
+            for (::Node* stmt : ifStmt->consequent) checkNode(stmt);
+            for (::Node* stmt : ifStmt->alternate) checkNode(stmt);
             return;
         }
 
         if (auto* whileLoop = dynamic_cast<WhileLoop*>(node)) {
             checkNode(whileLoop->condition);
-            for (Node* stmt : whileLoop->body) checkNode(stmt);
+            for (::Node* stmt : whileLoop->body) checkNode(stmt);
             return;
         }
 
@@ -87,7 +87,7 @@ private:
             }
             if (fl->start) checkNode(fl->start);
             if (fl->end) checkNode(fl->end);
-            for (Node* stmt : fl->body) checkNode(stmt);
+            for (::Node* stmt : fl->body) checkNode(stmt);
             symbols = saved;
             return;
         }
@@ -111,7 +111,7 @@ private:
             return;
         }
         if (auto* sl = dynamic_cast<StructLiteral*>(node)) {
-            for (Node* v : sl->fieldValues) checkNode(v);
+            for (::Node* v : sl->fieldValues) checkNode(v);
             return;
         }
 
@@ -126,7 +126,7 @@ private:
         }
 
         if (auto* call = dynamic_cast<CallExpression*>(node)) {
-            for (Node* arg : call->arguments) {
+            for (::Node* arg : call->arguments) {
                 checkNode(arg);
             }
             return;
@@ -187,7 +187,7 @@ private:
         }
 
         if (auto* lit = dynamic_cast<ArrayLiteral*>(node)) {
-            for (Node* el : lit->elements) checkNode(el);
+            for (::Node* el : lit->elements) checkNode(el);
             return;
         }
 
@@ -203,7 +203,7 @@ private:
     // way to know their real type, so (the same trust model as `extern
     // func`) the student's own annotation is trusted rather than
     // checked against a guess that can only ever be wrong.
-    bool isRawCSplice(Node* node) {
+    bool isRawCSplice(::Node* node) {
         auto* call = dynamic_cast<CallExpression*>(node);
         return call && (call->callee == "C_call" || call->callee == "C_top");
     }
@@ -264,13 +264,14 @@ private:
         }
     }
 
-    std::string inferType(Node* node) {
+    std::string inferType(::Node* node) {
         if (!node) return "void";
 
         if (dynamic_cast<LiteralInt*>(node)) return "number";
         if (dynamic_cast<LiteralDoudle*>(node)) return "double";
         if (dynamic_cast<LiteralString*>(node)) return "string";
         if (dynamic_cast<LiteralBool*>(node)) return "bool";
+        if (dynamic_cast<LiteralChar*>(node)) return "char";
 
         if (auto* ident = dynamic_cast<Identifier*>(node)) {
             auto it = symbols.find(ident->name);

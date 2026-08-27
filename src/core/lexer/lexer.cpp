@@ -50,6 +50,11 @@ public:
                 continue;
             }
 
+            if (c == '\'') {
+                tokens.push_back(readChar());
+                continue;
+            }
+
             if (c == '+' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '+') {
                 tokens.push_back(Token{TokenType::Incrementation, "++"});
                 pos_ += 2;
@@ -193,6 +198,38 @@ private:
         }
 
         return Token{TokenType::String, out};
+    }
+
+    Token readChar() {
+        ++pos_;                          // skip opening '
+        std::string out;
+
+        if (pos_ >= input_.size()) {
+            // unclosed or empty – decide how you want to error
+            return Token{TokenType::Char, ""};
+        }
+
+        if (input_[pos_] == '\\' && pos_ + 1 < input_.size()) {
+            ++pos_;
+            char next = input_[pos_];
+            if (next == 'n')      out = "\n";
+            else if (next == 't') out = "\t";
+            else if (next == '\'') out = "'";
+            else if (next == '\\') out = "\\";
+            else if (next == '0')  out = std::string(1, '\0');
+            else                   out = std::string(1, next);  // unknown escape → take the char
+            ++pos_;
+        } else {
+            out = std::string(1, input_[pos_]);
+            ++pos_;
+        }
+
+        // consume closing '
+        if (pos_ < input_.size() && input_[pos_] == '\'') {
+            ++pos_;
+        }
+
+        return Token{TokenType::Char, out};
     }
 
     std::string input_;

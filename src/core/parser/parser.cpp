@@ -151,7 +151,7 @@ private:
             return parseIdentifierStatement();
         }
 
-        if (peek().type == TokenType::Number || peek().type == TokenType::Double || peek().type == TokenType::String)
+        if (peek().type == TokenType::Number || peek().type == TokenType::Double || peek().type == TokenType::String || peek().type == TokenType::Char)
         {
             return parseLiteralStatement();
         }
@@ -631,6 +631,21 @@ private:
         {
             LiteralString *val = new LiteralString();
             val->value = tok.value;
+            return val;
+        }
+
+        if (tok.type == TokenType::Char) {
+            LiteralChar *val = new LiteralChar();
+
+            if (tok.value.empty()) {
+                // malformed / empty char literal – decide your error policy
+                // Option A: treat as null character
+                val->value = '0';
+                // Option B: return an error node / report and recover
+            } else {
+                val->value = static_cast<unsigned char>(tok.value[0]);  // or just tok.value[0]
+            }
+
             return val;
         }
 

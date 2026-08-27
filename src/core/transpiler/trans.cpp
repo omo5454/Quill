@@ -45,6 +45,8 @@ namespace
             return "bool";
         if (typeName == "void")
             return "void";
+        if (typeName == "char")
+            return "char";
         return typeName;
     }
 
@@ -57,6 +59,8 @@ namespace
         std::string type = trim(typeName);
         if (type == "string" || type == "const char*")
             return "string";
+        if (type == "char")
+            return "char";
         if (type == "double" || type == "double")
             return "double";
         if (type == "bool")
@@ -152,6 +156,8 @@ namespace
             return "double";
         if (dynamic_cast<LiteralString *>(node))
             return "string";
+        if (dynamic_cast<LiteralChar *>(node))
+            return "char";
         if (dynamic_cast<LiteralBool *>(node))
             return "bool";
 
@@ -400,7 +406,7 @@ namespace
     {
         std::string type = inferNodeType(node, scope, functionReturnTypes);
         std::string code = astToC(node, scope, functionReturnTypes);
-        if (type == "string")
+        if (type == "string" || type == "char")
             return code;
         if (type == "double")
             return "quill_ftoa(" + code + ")";
@@ -542,6 +548,20 @@ namespace
             return litBool->value ? "true" : "false";
         if (auto *litStr = dynamic_cast<LiteralString *>(node))
             return "\"" + litStr->value + "\"";
+        if (auto *litChar = dynamic_cast<LiteralChar *>(node)) {
+            // Emit a proper C character constant
+            char c = static_cast<char>(litChar->value);
+            if (c == '\n') return "'\\n'";
+            if (c == '\t') return "'\\t'";
+            if (c == '\'') return "'\\''";
+            if (c == '\\') return "'\\\\'";
+            if (c == '\0') return "'\\0'";
+            // printable ASCII
+            if (c >= 32 && c < 127)
+                return std::string("'") + c + "'";
+            // fallback: just the integer code point
+            return std::to_string(static_cast<int>(static_cast<unsigned char>(c)));
+        }
         if (auto *ident = dynamic_cast<Identifier *>(node))
             return ident->name;
 
@@ -581,6 +601,8 @@ namespace
             std::string type = inferNodeType(print->expression, scope, functionReturnTypes);
             if (type == "string")
                 return "printf(\"%s\\n\", " + exprCode + ");";
+            if (type == "char")
+                return "printf(\"%c\\n\", " + exprCode + ");";
             if (type == "double")
                 return "printf(\"%f\\n\", " + exprCode + ");";
             if (type == "bool")
@@ -629,7 +651,6 @@ namespace
             block << "    }";
             return block.str();
         }
-
 
         if (auto *fl = dynamic_cast<ForLoop *>(node))
         {
@@ -855,6 +876,8 @@ namespace
             {
                 if (argTypes[0] == "string")
                     return "// string type not supported on input.";
+                if (argTypes[0] == "char")
+                    return "getchar();";
                 if (argTypes[0] == "number")
                     return "scanf(\"%d\", &" + argCodes[0] + ");";
 
@@ -865,7 +888,7 @@ namespace
             }
             else if (name == "toString" && argCodes.size() == 1)
             {
-                if (argTypes[0] == "string")
+                if (argTypes[0] == "string" || argTypes[0] == "char")
                     return argCodes[0];
                 if (argTypes[0] == "double")
                     return "quill_ftoa(" + argCodes[0] + ")";
