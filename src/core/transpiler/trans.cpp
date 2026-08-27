@@ -877,7 +877,7 @@ namespace
             else if (name == "input" && argCodes.size() == 1)
             {
                 if (argTypes[0] == "string")
-                    return "// string type not supported on input.";
+                    return "char tmp[512];\n    fgets(tmp, sizeof(tmp), stdin);\n    " + argCodes[0] +" = tmp;";
                 if (argTypes[0] == "char")
                     return "{ int _c; do { _c = getchar(); } while (_c != EOF && isspace((unsigned char)_c)); " + argCodes[0] + " = (char)_c; }";
                 if (argTypes[0] == "number")
