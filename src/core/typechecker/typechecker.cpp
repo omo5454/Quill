@@ -28,6 +28,7 @@ public:
 private:
     std::unordered_map<std::string, std::string> symbols;
     std::map<std::string, std::string> functionReturnTypes;
+    std::map<std::string, std::map<std::string, std::string>> structFields;
 
     void checkNode(Node* node) {
         if (!node) return;
@@ -74,6 +75,46 @@ private:
             return;
         }
 
+        if (auto* fl = dynamic_cast<ForLoop*>(node)) {
+            auto saved = symbols;
+            symbols[fl->iterator] = "number";
+            if (fl->collection) {
+                checkNode(fl->collection);
+                std::string ct = inferType(fl->collection);
+                auto b = ct.find('[');
+                if (b != std::string::npos)
+                    symbols[fl->iterator] = ct.substr(0, b);
+            }
+            if (fl->start) checkNode(fl->start);
+            if (fl->end) checkNode(fl->end);
+            for (Node* stmt : fl->body) checkNode(stmt);
+            symbols = saved;
+            return;
+        }
+
+        if (auto* sd = dynamic_cast<StructDecl*>(node)) {
+            std::map<std::string, std::string> fields;
+            for (const auto& f : sd->fields) {
+                fields[f.name] = f.type.empty() ? "number" : f.type;
+            }
+            structFields[sd->name] = fields;
+            return;
+        }
+
+        if (auto* fa = dynamic_cast<FieldAccess*>(node)) {
+            checkNode(fa->object);
+            return;
+        }
+        if (auto* fas = dynamic_cast<FieldAssignment*>(node)) {
+            checkNode(fas->object);
+            checkNode(fas->value);
+            return;
+        }
+        if (auto* sl = dynamic_cast<StructLiteral*>(node)) {
+            for (Node* v : sl->fieldValues) checkNode(v);
+            return;
+        }
+
         if (auto* ret = dynamic_cast<ReturnStatement*>(node)) {
             checkNode(ret->value);
             return;
@@ -107,8 +148,9 @@ private:
             checkNode(idx->index);
             std::string objType = inferType(idx->object);
             bool isArray = objType.find('[') != std::string::npos;
-            if (objType != "string" && !isArray) {
-                throw std::runtime_error("indexing with [] is only supported on string or array values");
+            bool isMap = objType.rfind("map[", 0) == 0;
+            if (objType != "string" && !isArray && !isMap) {
+                throw std::runtime_error("indexing with [] is only supported on string, array, or map values");
             }
             return;
         }
@@ -119,9 +161,21 @@ private:
             checkNode(idxAssign->value);
 
             std::string objType = inferType(idxAssign->object);
+            if (objType.rfind("map[", 0) == 0) {
+                auto comma = objType.find(',');
+                auto rb = objType.rfind(']');
+                std::string valT = "number";
+                if (comma != std::string::npos && rb != std::string::npos)
+                    valT = objType.substr(comma + 1, rb - comma - 1);
+                std::string valueType = inferType(idxAssign->value);
+                if (valueType != valT && valueType != "unknown") {
+                    throw std::runtime_error("type mismatch assigning into map");
+                }
+                return;
+            }
             auto bracketPos = objType.find('[');
             if (bracketPos == std::string::npos) {
-                throw std::runtime_error("assignment with [] is only supported on array values");
+                throw std::runtime_error("assignment with [] is only supported on array or map values");
             }
 
             std::string elemType = objType.substr(0, bracketPos);
@@ -132,11 +186,8 @@ private:
             return;
         }
 
-
         if (auto* lit = dynamic_cast<ArrayLiteral*>(node)) {
-            for (Node* el : lit->elements) {
-                checkNode(el);
-            }
+            for (Node* el : lit->elements) checkNode(el);
             return;
         }
 
@@ -176,19 +227,17 @@ private:
 
         std::string valueType = inferType(decl->value);
         if (!decl->declaredType.empty()) {
-            // Fixed number[3] may be initialized from number[] literal of length 3
-            // Dynamic number[] matches number[] literal
             bool declArr = decl->declaredType.find('[') != std::string::npos;
             bool valArr = valueType.find('[') != std::string::npos;
             if (declArr && valArr) {
                 std::string declElem = decl->declaredType.substr(0, decl->declaredType.find('['));
                 std::string valElem = valueType.substr(0, valueType.find('['));
-                if (declElem != valElem) {
+                if (declElem != valElem)
                     throw std::runtime_error("type mismatch for variable: " + decl->identifier);
-                }
-                // length check for fixed-size left to runtime / optional later
-            } else if (decl->declaredType != valueType) {
-                throw std::runtime_error("type mismatch for variable: " + decl->identifier);
+            } else if (decl->declaredType != valueType && valueType != "unknown") {
+                // allow struct name match when value is struct literal
+                if (!(structFields.count(decl->declaredType) && valueType == decl->declaredType))
+                    throw std::runtime_error("type mismatch for variable: " + decl->identifier);
             }
             symbols[decl->identifier] = decl->declaredType;
         } else {
@@ -229,9 +278,15 @@ private:
             return "unknown";
         }
 
-        // Indexing: string -> char code (number); T[N]/T[] -> T
         if (auto* idx = dynamic_cast<IndexExpression*>(node)) {
             std::string objType = inferType(idx->object);
+            if (objType.rfind("map[", 0) == 0) {
+                auto comma = objType.find(',');
+                auto rb = objType.rfind(']');
+                if (comma != std::string::npos && rb != std::string::npos)
+                    return objType.substr(comma + 1, rb - comma - 1);
+                return "number";
+            }
             auto bracketPos = objType.find('[');
             if (bracketPos != std::string::npos)
                 return objType.substr(0, bracketPos);
@@ -242,12 +297,11 @@ private:
 
         if (auto* lit = dynamic_cast<ArrayLiteral*>(node)) {
             if (lit->elements.empty())
-                return "number[]"; // default empty literal
+                return "number[]";
             std::string elem = inferType(lit->elements[0]);
             for (size_t i = 1; i < lit->elements.size(); i++) {
                 std::string t = inferType(lit->elements[i]);
                 if (t != elem) {
-                    // allow number/double promotion inside literals
                     if ((elem == "number" && t == "double") || (elem == "double" && t == "number"))
                         elem = "double";
                     else
@@ -255,6 +309,19 @@ private:
                 }
             }
             return elem + "[]";
+        }
+
+        if (auto* fa = dynamic_cast<FieldAccess*>(node)) {
+            std::string ot = inferType(fa->object);
+            auto it = structFields.find(ot);
+            if (it != structFields.end()) {
+                auto ft = it->second.find(fa->field);
+                if (ft != it->second.end()) return ft->second;
+            }
+            return "unknown";
+        }
+        if (auto* sl = dynamic_cast<StructLiteral*>(node)) {
+            return sl->name;
         }
 
         if (auto* binary = dynamic_cast<BinaryExpression*>(node)) {

@@ -74,6 +74,24 @@ public:
                 continue;
             }
 
+            if (c == '<' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '<') {
+                tokens.push_back(Token{TokenType::Operator, "<<"});
+                pos_ += 2;
+                continue;
+            }
+
+            if (c == '>' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '>') {
+                tokens.push_back(Token{TokenType::Operator, ">>"});
+                pos_ += 2;
+                continue;
+            }
+
+            if (c == '.' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '.') {
+                tokens.push_back(Token{TokenType::Operator, ".."});
+                pos_ += 2;
+                continue;
+            }
+
             if (c == '=' && pos_ + 1 < input_.size() && input_[pos_ + 1] == '=') {
                 tokens.push_back(Token{TokenType::Operator, "=="});
                 pos_ += 2;
@@ -98,7 +116,7 @@ public:
                 continue;
             }
 
-            if (c == ':' || c == ',' || c == '(' || c == ')' || c == '{' || c == '}' || c == '[' || c == ']' || c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == '>' || c == '<' || c == '!' || c == '=' || c == '&' || c == '|') {
+            if (c == ':' || c == ',' || c == '(' || c == ')' || c == '{' || c == '}' || c == '[' || c == ']' || c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == '>' || c == '<' || c == '!' || c == '=' || c == '&' || c == '|' || c == '^' || c == '~' || c == '.') {
                 tokens.push_back(Token{TokenType::Operator, std::string(1, c)});
                 ++pos_;
                 continue;
@@ -122,6 +140,7 @@ private:
         std::string text = input_.substr(start, pos_ - start);
         if (text == "let" || text == "mut" || text == "const" || text == "printf" || text == "say" ||
             text == "func" || text == "fn" || text == "if" || text == "else" || text == "elif" || text == "while" ||
+            text == "for" || text == "in" || text == "struct" || text == "map" ||
             text == "return" || text == "true" || text == "false" || text == "import" || text == "extern") {
             return Token{TokenType::Keyword, text};
         }
@@ -135,7 +154,11 @@ private:
             ++pos_;
         }
 
-        if (pos_ < input_.size() && input_[pos_] == '.') {
+        // Only treat '.' as a float decimal if a digit follows.
+        // Otherwise `0..5` (for-range) would be eaten as `0.` + `.` + `5`.
+        if (pos_ < input_.size() && input_[pos_] == '.' &&
+            pos_ + 1 < input_.size() &&
+            std::isdigit(static_cast<unsigned char>(input_[pos_ + 1]))) {
             ++pos_;
             while (pos_ < input_.size() && std::isdigit(static_cast<unsigned char>(input_[pos_]))) {
                 ++pos_;

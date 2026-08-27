@@ -129,3 +129,39 @@ struct UnaryExpression : Node {
 struct ImportStatement : Node {
     std::string path;
 };
+
+struct StructField {
+    std::string name;
+    std::string type;
+};
+
+struct StructDecl : Node {
+    std::string name;
+    std::vector<StructField> fields;
+};
+
+struct FieldAccess : Node {
+    Node* object = nullptr;
+    std::string field;
+};
+
+struct FieldAssignment : Node {
+    Node* object = nullptr;
+    std::string field;
+    Node* value = nullptr;
+};
+
+struct StructLiteral : Node {
+    std::string name;
+    std::vector<std::string> fieldNames;
+    std::vector<Node*> fieldValues;
+};
+
+// for i in a..b { }  or  for x in arr { }
+struct ForLoop : Node {
+    std::string iterator;
+    Node* start = nullptr;      // range start (null if foreach)
+    Node* end = nullptr;        // range end
+    Node* collection = nullptr; // foreach collection (null if range)
+    std::vector<Node*> body;
+};

@@ -65,8 +65,11 @@ namespace
             return "number";
         if (type == "void")
             return "void";
+        if (!type.empty() && type.find('[') == std::string::npos)
+            return type;
         return "number";
     }
+
 
     // --- array type helpers -------------------------------------------------
     // "number[5]"  -> fixed, size 5
@@ -108,6 +111,34 @@ namespace
         return "quill_arr_int";
     }
 
+    bool isMapType(const std::string &t)
+    {
+        return t.rfind("map[", 0) == 0;
+    }
+    std::string mapKeyType(const std::string &t)
+    {
+        auto lb = t.find('[');
+        auto comma = t.find(',');
+        if (lb == std::string::npos || comma == std::string::npos)
+            return "string";
+        return t.substr(lb + 1, comma - lb - 1);
+    }
+    std::string mapValType(const std::string &t)
+    {
+        auto comma = t.find(',');
+        auto rb = t.rfind(']');
+        if (comma == std::string::npos || rb == std::string::npos)
+            return "number";
+        return t.substr(comma + 1, rb - comma - 1);
+    }
+    std::string mapRuntimeName(const std::string &valT)
+    {
+        if (valT == "string") return "quill_map_str";
+        if (valT == "double") return "quill_map_double";
+        if (valT == "bool") return "quill_map_bool";
+        return "quill_map_int";
+    }
+
     std::string inferNodeType(Node *node,
                               const std::map<std::string, std::string> &scope,
                               const std::map<std::string, std::string> &functionReturnTypes)
@@ -139,6 +170,8 @@ namespace
         if (auto *idx = dynamic_cast<IndexExpression *>(node))
         {
             std::string objType = inferNodeType(idx->object, scope, functionReturnTypes);
+            if (isMapType(objType))
+                return mapValType(objType);
             auto bracketPos = objType.find('[');
             if (bracketPos != std::string::npos)
             {
@@ -218,7 +251,8 @@ namespace
             {
                 std::string type;
                 bool isArrayType = decl->declaredType.find('[') != std::string::npos;
-                if (isArrayType)
+                bool isMap = decl->declaredType.rfind("map[", 0) == 0;
+                if (isMap || isArrayType)
                 {
                     type = decl->declaredType;
                 }
@@ -240,6 +274,10 @@ namespace
             else if (auto *loop = dynamic_cast<WhileLoop *>(node))
             {
                 collectDeclaredLocals(loop->body, scope, functionReturnTypes);
+            }
+            else if (auto *fl = dynamic_cast<ForLoop *>(node))
+            {
+                collectDeclaredLocals(fl->body, scope, functionReturnTypes);
             }
         }
     }
@@ -324,7 +362,15 @@ namespace
         types["len"] = "number";
         types["toString"] = "string";
         types["push"] = "void";
-        types["pop"] = "number"; // element type approximated; real type depends on array
+        types["pop"] = "number";
+        types["read_file"] = "string";
+        types["write_file"] = "number";
+        types["file_exists"] = "bool";
+        types["argc"] = "number";
+        types["argv"] = "string";
+        types["map_has"] = "bool";
+        types["map_len"] = "number";
+        types["map_del"] = "void";
 
         for (Node *node : program.body)
         {
@@ -374,6 +420,12 @@ namespace
         {
             auto it = scope.find(decl->identifier);
             std::string typeName = it != scope.end() ? it->second : "number";
+
+            if (isMapType(typeName))
+            {
+                std::string rt = mapRuntimeName(mapValType(typeName));
+                return rt + " " + decl->identifier + " = " + rt + "_new();";
+            }
 
             // Dynamic array: number[] / double[] / ...
             if (isDynamicArrayType(typeName))
@@ -428,8 +480,12 @@ namespace
             }
 
             std::string type = convertTypeName(typeName);
-            std::string val = decl->value ? astToC(decl->value, scope, functionReturnTypes) : "0";
-            return type + " " + decl->identifier + " = " + val + ";";
+            if (decl->value)
+            {
+                return type + " " + decl->identifier + " = " +
+                       astToC(decl->value, scope, functionReturnTypes) + ";";
+            }
+            return type + " " + decl->identifier + " = {0};";
         }
 
         if (auto *assign = dynamic_cast<Assignment *>(node))
@@ -443,6 +499,11 @@ namespace
             std::string idxCode = astToC(idxAssign->index, scope, functionReturnTypes);
             std::string valCode = astToC(idxAssign->value, scope, functionReturnTypes);
             std::string objType = inferNodeType(idxAssign->object, scope, functionReturnTypes);
+            if (isMapType(objType))
+            {
+                std::string rt = mapRuntimeName(mapValType(objType));
+                return rt + "_set(&" + objCode + ", " + idxCode + ", " + valCode + ");";
+            }
             if (isDynamicArrayType(objType))
             {
                 std::string pref = dynArrPrefix(arrayElemType(objType));
@@ -489,6 +550,11 @@ namespace
             std::string objCode = astToC(idx->object, scope, functionReturnTypes);
             std::string idxCode = astToC(idx->index, scope, functionReturnTypes);
             std::string objType = inferNodeType(idx->object, scope, functionReturnTypes);
+            if (isMapType(objType))
+            {
+                std::string rt = mapRuntimeName(mapValType(objType));
+                return rt + "_get(&" + objCode + ", " + idxCode + ")";
+            }
             if (isDynamicArrayType(objType))
             {
                 std::string pref = dynArrPrefix(arrayElemType(objType));
@@ -564,6 +630,106 @@ namespace
             return block.str();
         }
 
+
+        if (auto *fl = dynamic_cast<ForLoop *>(node))
+        {
+            std::ostringstream block;
+            if (fl->start && fl->end)
+            {
+                block << "for (int " << fl->iterator << " = "
+                      << astToC(fl->start, scope, functionReturnTypes) << "; "
+                      << fl->iterator << " < "
+                      << astToC(fl->end, scope, functionReturnTypes) << "; "
+                      << fl->iterator << "++) {\n";
+            }
+            else if (fl->collection)
+            {
+                std::string col = astToC(fl->collection, scope, functionReturnTypes);
+                std::string colType = inferNodeType(fl->collection, scope, functionReturnTypes);
+                if (isDynamicArrayType(colType))
+                {
+                    std::string pref = dynArrPrefix(arrayElemType(colType));
+                    std::string elemC = convertTypeName(arrayElemType(colType));
+                    block << "for (int __qi = 0; __qi < " << pref << "_len(&" << col << "); __qi++) {\n";
+                    block << "        " << elemC << " " << fl->iterator << " = "
+                          << pref << "_get(&" << col << ", __qi);\n";
+                }
+                else if (isArrayTypeName(colType))
+                {
+                    std::string elemC = convertTypeName(arrayElemType(colType));
+                    block << "for (int __qi = 0; __qi < (int)(sizeof(" << col
+                          << ")/sizeof((" << col << ")[0])); __qi++) {\n";
+                    block << "        " << elemC << " " << fl->iterator << " = "
+                          << col << "[__qi];\n";
+                }
+                else
+                {
+                    block << "{\n";
+                }
+            }
+            else
+            {
+                block << "{\n";
+            }
+            for (Node *stmt : fl->body)
+            {
+                std::string sc = astToC(stmt, scope, functionReturnTypes);
+                if (!sc.empty() && sc.back() != ';' && sc.back() != '}')
+                    sc += ";";
+                block << "        " << sc << "\n";
+            }
+            block << "    }";
+            return block.str();
+        }
+
+        if (auto *sd = dynamic_cast<StructDecl *>(node))
+        {
+            std::ostringstream block;
+            block << "typedef struct {\n";
+            for (const auto &f : sd->fields)
+            {
+                std::string ty = f.type.empty() ? "number" : f.type;
+                if (isDynamicArrayType(ty))
+                    block << "        " << dynArrCType(arrayElemType(ty)) << " " << f.name << ";\n";
+                else if (isArrayTypeName(ty))
+                {
+                    auto bpos = ty.find('[');
+                    block << "        " << convertTypeName(ty.substr(0, bpos)) << " " << f.name
+                          << ty.substr(bpos) << ";\n";
+                }
+                else
+                    block << "        " << convertTypeName(ty) << " " << f.name << ";\n";
+            }
+            block << "    } " << sd->name << ";";
+            return block.str();
+        }
+
+        if (auto *fa = dynamic_cast<FieldAccess *>(node))
+        {
+            return astToC(fa->object, scope, functionReturnTypes) + "." + fa->field;
+        }
+
+        if (auto *fas = dynamic_cast<FieldAssignment *>(node))
+        {
+            return astToC(fas->object, scope, functionReturnTypes) + "." + fas->field + " = " +
+                   astToC(fas->value, scope, functionReturnTypes) + ";";
+        }
+
+        if (auto *sl = dynamic_cast<StructLiteral *>(node))
+        {
+            std::ostringstream block;
+            block << "(" << sl->name << "){";
+            for (size_t i = 0; i < sl->fieldNames.size(); ++i)
+            {
+                if (i)
+                    block << ", ";
+                block << "." << sl->fieldNames[i] << " = "
+                      << astToC(sl->fieldValues[i], scope, functionReturnTypes);
+            }
+            block << "}";
+            return block.str();
+        }
+
         if (auto *exprStmt = dynamic_cast<ExpressionStatement *>(node))
         {
             std::string code = astToC(exprStmt->expression, scope, functionReturnTypes);
@@ -602,6 +768,11 @@ namespace
             else if (name == "len" && argCodes.size() == 1)
             {
                 std::string t = argTypes[0];
+                if (isMapType(t))
+                {
+                    std::string rt = mapRuntimeName(mapValType(t));
+                    return rt + "_len(&" + argCodes[0] + ")";
+                }
                 if (isDynamicArrayType(t))
                 {
                     std::string pref = dynArrPrefix(arrayElemType(t));
@@ -609,10 +780,47 @@ namespace
                 }
                 if (isArrayTypeName(t) && !isDynamicArrayType(t))
                 {
-                    // fixed-size: sizeof(a)/sizeof(a[0])
                     return "(int)(sizeof(" + argCodes[0] + ") / sizeof((" + argCodes[0] + ")[0]))";
                 }
                 return "(int)strlen(" + argCodes[0] + ")";
+            }
+            else if (name == "read_file" && argCodes.size() == 1)
+            {
+                return "quill_read_file(" + argCodes[0] + ")";
+            }
+            else if (name == "write_file" && argCodes.size() == 2)
+            {
+                return "quill_write_file(" + argCodes[0] + ", " + argCodes[1] + ")";
+            }
+            else if (name == "file_exists" && argCodes.size() == 1)
+            {
+                return "quill_file_exists(" + argCodes[0] + ")";
+            }
+            else if (name == "argc" && argCodes.size() == 0)
+            {
+                return "quill_argc";
+            }
+            else if (name == "argv" && argCodes.size() == 1)
+            {
+                return "quill_argv_at(" + argCodes[0] + ")";
+            }
+            else if (name == "map_has" && argCodes.size() == 2)
+            {
+                std::string t = argTypes[0];
+                std::string rt = isMapType(t) ? mapRuntimeName(mapValType(t)) : "quill_map_int";
+                return rt + "_has(&" + argCodes[0] + ", " + argCodes[1] + ")";
+            }
+            else if (name == "map_del" && argCodes.size() == 2)
+            {
+                std::string t = argTypes[0];
+                std::string rt = isMapType(t) ? mapRuntimeName(mapValType(t)) : "quill_map_int";
+                return rt + "_del(&" + argCodes[0] + ", " + argCodes[1] + ")";
+            }
+            else if (name == "map_len" && argCodes.size() == 1)
+            {
+                std::string t = argTypes[0];
+                std::string rt = isMapType(t) ? mapRuntimeName(mapValType(t)) : "quill_map_int";
+                return rt + "_len(&" + argCodes[0] + ")";
             }
             else if (name == "push" && argCodes.size() == 2)
             {
@@ -883,6 +1091,12 @@ namespace
                     funcStream << "}\n";
                     functionBlocks.push_back(funcStream.str());
                 }
+                else if (auto *sdecl = dynamic_cast<StructDecl *>(node))
+                {
+                    std::string code = astToC(node, mainScope, functionReturnTypes);
+                    if (!code.empty())
+                        preambleLines.push_back(code);
+                }
                 else if (auto *topCall = dynamic_cast<CallExpression *>(node);
                          topCall && topCall->callee == "C_top")
                 {
@@ -1032,6 +1246,197 @@ namespace
             }
             )QUILL_ARR";
 
+                        out << R"QUILL_IO(
+            /* --- argv --- */
+            static int quill_argc = 0;
+            static char **quill_argv_ptr = 0;
+            static const char *quill_argv_at(int i) {
+                if (!quill_argv_ptr || i < 0 || i >= quill_argc) return "";
+                return quill_argv_ptr[i] ? quill_argv_ptr[i] : "";
+            }
+
+            /* --- file I/O --- */
+            static char *quill_read_file(const char *path) {
+                FILE *f = fopen(path, "rb");
+                if (!f) return quill_dup("");
+                fseek(f, 0, SEEK_END);
+                long n = ftell(f);
+                fseek(f, 0, SEEK_SET);
+                if (n < 0) { fclose(f); return quill_dup(""); }
+                char *buf = (char*)malloc((size_t)n + 1);
+                if (!buf) { fclose(f); return quill_dup(""); }
+                size_t got = fread(buf, 1, (size_t)n, f);
+                buf[got] = '\0';
+                fclose(f);
+                return buf;
+            }
+            static int quill_write_file(const char *path, const char *data) {
+                FILE *f = fopen(path, "wb");
+                if (!f) return -1;
+                if (data) fputs(data, f);
+                fclose(f);
+                return 0;
+            }
+            static bool quill_file_exists(const char *path) {
+                FILE *f = fopen(path, "rb");
+                if (!f) return false;
+                fclose(f);
+                return true;
+            }
+
+            /* --- maps (string keys) --- */
+            typedef struct quill_map_int_entry {
+                char *key;
+                int value;
+                struct quill_map_int_entry *next;
+            } quill_map_int_entry;
+            typedef struct { quill_map_int_entry *head; int length; } quill_map_int;
+
+            typedef struct quill_map_str_entry {
+                char *key;
+                const char *value;
+                struct quill_map_str_entry *next;
+            } quill_map_str_entry;
+            typedef struct { quill_map_str_entry *head; int length; } quill_map_str;
+
+            typedef struct quill_map_double_entry {
+                char *key;
+                double value;
+                struct quill_map_double_entry *next;
+            } quill_map_double_entry;
+            typedef struct { quill_map_double_entry *head; int length; } quill_map_double;
+
+            typedef struct quill_map_bool_entry {
+                char *key;
+                bool value;
+                struct quill_map_bool_entry *next;
+            } quill_map_bool_entry;
+            typedef struct { quill_map_bool_entry *head; int length; } quill_map_bool;
+
+            static quill_map_int quill_map_int_new(void) { quill_map_int m; m.head = 0; m.length = 0; return m; }
+            static quill_map_str quill_map_str_new(void) { quill_map_str m; m.head = 0; m.length = 0; return m; }
+            static quill_map_double quill_map_double_new(void) { quill_map_double m; m.head = 0; m.length = 0; return m; }
+            static quill_map_bool quill_map_bool_new(void) { quill_map_bool m; m.head = 0; m.length = 0; return m; }
+
+            static void quill_map_int_set(quill_map_int *m, const char *key, int val) {
+                for (quill_map_int_entry *e = m->head; e; e = e->next) {
+                    if (strcmp(e->key, key) == 0) { e->value = val; return; }
+                }
+                quill_map_int_entry *e = (quill_map_int_entry*)malloc(sizeof(*e));
+                e->key = quill_dup(key); e->value = val; e->next = m->head; m->head = e; m->length++;
+            }
+            static int quill_map_int_get(quill_map_int *m, const char *key) {
+                for (quill_map_int_entry *e = m->head; e; e = e->next)
+                    if (strcmp(e->key, key) == 0) return e->value;
+                return 0;
+            }
+            static bool quill_map_int_has(quill_map_int *m, const char *key) {
+                for (quill_map_int_entry *e = m->head; e; e = e->next)
+                    if (strcmp(e->key, key) == 0) return true;
+                return false;
+            }
+            static void quill_map_int_del(quill_map_int *m, const char *key) {
+                quill_map_int_entry **pp = &m->head;
+                while (*pp) {
+                    if (strcmp((*pp)->key, key) == 0) {
+                        quill_map_int_entry *dead = *pp; *pp = dead->next;
+                        free(dead->key); free(dead); m->length--; return;
+                    }
+                    pp = &(*pp)->next;
+                }
+            }
+            static int quill_map_int_len(quill_map_int *m) { return m->length; }
+
+            static void quill_map_str_set(quill_map_str *m, const char *key, const char *val) {
+                for (quill_map_str_entry *e = m->head; e; e = e->next) {
+                    if (strcmp(e->key, key) == 0) { e->value = val; return; }
+                }
+                quill_map_str_entry *e = (quill_map_str_entry*)malloc(sizeof(*e));
+                e->key = quill_dup(key); e->value = val; e->next = m->head; m->head = e; m->length++;
+            }
+            static const char *quill_map_str_get(quill_map_str *m, const char *key) {
+                for (quill_map_str_entry *e = m->head; e; e = e->next)
+                    if (strcmp(e->key, key) == 0) return e->value ? e->value : "";
+                return "";
+            }
+            static bool quill_map_str_has(quill_map_str *m, const char *key) {
+                for (quill_map_str_entry *e = m->head; e; e = e->next)
+                    if (strcmp(e->key, key) == 0) return true;
+                return false;
+            }
+            static void quill_map_str_del(quill_map_str *m, const char *key) {
+                quill_map_str_entry **pp = &m->head;
+                while (*pp) {
+                    if (strcmp((*pp)->key, key) == 0) {
+                        quill_map_str_entry *dead = *pp; *pp = dead->next;
+                        free(dead->key); free(dead); m->length--; return;
+                    }
+                    pp = &(*pp)->next;
+                }
+            }
+            static int quill_map_str_len(quill_map_str *m) { return m->length; }
+
+            static void quill_map_double_set(quill_map_double *m, const char *key, double val) {
+                for (quill_map_double_entry *e = m->head; e; e = e->next) {
+                    if (strcmp(e->key, key) == 0) { e->value = val; return; }
+                }
+                quill_map_double_entry *e = (quill_map_double_entry*)malloc(sizeof(*e));
+                e->key = quill_dup(key); e->value = val; e->next = m->head; m->head = e; m->length++;
+            }
+            static double quill_map_double_get(quill_map_double *m, const char *key) {
+                for (quill_map_double_entry *e = m->head; e; e = e->next)
+                    if (strcmp(e->key, key) == 0) return e->value;
+                return 0.0;
+            }
+            static bool quill_map_double_has(quill_map_double *m, const char *key) {
+                for (quill_map_double_entry *e = m->head; e; e = e->next)
+                    if (strcmp(e->key, key) == 0) return true;
+                return false;
+            }
+            static void quill_map_double_del(quill_map_double *m, const char *key) {
+                quill_map_double_entry **pp = &m->head;
+                while (*pp) {
+                    if (strcmp((*pp)->key, key) == 0) {
+                        quill_map_double_entry *dead = *pp; *pp = dead->next;
+                        free(dead->key); free(dead); m->length--; return;
+                    }
+                    pp = &(*pp)->next;
+                }
+            }
+            static int quill_map_double_len(quill_map_double *m) { return m->length; }
+
+            static void quill_map_bool_set(quill_map_bool *m, const char *key, bool val) {
+                for (quill_map_bool_entry *e = m->head; e; e = e->next) {
+                    if (strcmp(e->key, key) == 0) { e->value = val; return; }
+                }
+                quill_map_bool_entry *e = (quill_map_bool_entry*)malloc(sizeof(*e));
+                e->key = quill_dup(key); e->value = val; e->next = m->head; m->head = e; m->length++;
+            }
+            static bool quill_map_bool_get(quill_map_bool *m, const char *key) {
+                for (quill_map_bool_entry *e = m->head; e; e = e->next)
+                    if (strcmp(e->key, key) == 0) return e->value;
+                return false;
+            }
+            static bool quill_map_bool_has(quill_map_bool *m, const char *key) {
+                for (quill_map_bool_entry *e = m->head; e; e = e->next)
+                    if (strcmp(e->key, key) == 0) return true;
+                return false;
+            }
+            static void quill_map_bool_del(quill_map_bool *m, const char *key) {
+                quill_map_bool_entry **pp = &m->head;
+                while (*pp) {
+                    if (strcmp((*pp)->key, key) == 0) {
+                        quill_map_bool_entry *dead = *pp; *pp = dead->next;
+                        free(dead->key); free(dead); m->length--; return;
+                    }
+                    pp = &(*pp)->next;
+                }
+            }
+            static int quill_map_bool_len(quill_map_bool *m) { return m->length; }
+            )QUILL_IO";
+
+
+
             for (const std::string &line : preambleLines)
                 out << line << "\n";
             if (!preambleLines.empty())
@@ -1039,7 +1444,9 @@ namespace
 
             for (const std::string &fn : functionBlocks)
                 out << fn << "\n";
-            out << "int main(void) {\n";
+            out << "int main(int argc, char **argv) {\n";
+            out << "    quill_argc = argc;\n";
+            out << "    quill_argv_ptr = argv;\n";
             for (const std::string &line : mainLines)
                 out << "    " << line << "\n";
             out << "    return 0;\n}\n";
