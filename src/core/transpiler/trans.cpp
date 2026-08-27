@@ -406,8 +406,10 @@ namespace
     {
         std::string type = inferNodeType(node, scope, functionReturnTypes);
         std::string code = astToC(node, scope, functionReturnTypes);
-        if (type == "string" || type == "char")
+        if (type == "string")
             return code;
+        if (type == "char")
+            return "quill_char_str(" + code + ")";
         if (type == "double")
             return "quill_ftoa(" + code + ")";
         if (type == "bool")
@@ -600,14 +602,14 @@ namespace
             std::string exprCode = astToC(print->expression, scope, functionReturnTypes);
             std::string type = inferNodeType(print->expression, scope, functionReturnTypes);
             if (type == "string")
-                return "printf(\"%s\\n\", " + exprCode + ");";
+                return "printf(\"%s\", " + exprCode + ");";
             if (type == "char")
-                return "printf(\"%c\\n\", " + exprCode + ");";
+                return "printf(\"%c\", " + exprCode + ");";
             if (type == "double")
-                return "printf(\"%f\\n\", " + exprCode + ");";
+                return "printf(\"%f\", " + exprCode + ");";
             if (type == "bool")
-                return "printf(\"%s\\n\", (" + exprCode + ") ? \"true\" : \"false\");";
-            return "printf(\"%d\\n\", " + exprCode + ");";
+                return "printf(\"%s\", (" + exprCode + ") ? \"true\" : \"false\");";
+            return "printf(\"%d\", " + exprCode + ");";
         }
 
         if (auto *inc = dynamic_cast<Increment *>(node))
@@ -877,7 +879,7 @@ namespace
                 if (argTypes[0] == "string")
                     return "// string type not supported on input.";
                 if (argTypes[0] == "char")
-                    return "" + argCodes[0] + " = getchar();";
+                    return "{ int _c; do { _c = getchar(); } while (_c != EOF && isspace((unsigned char)_c)); " + argCodes[0] + " = (char)_c; }";
                 if (argTypes[0] == "number")
                     return "scanf(\"%d\", &" + argCodes[0] + ");";
 
@@ -1457,6 +1459,12 @@ namespace
             }
             static int quill_map_bool_len(quill_map_bool *m) { return m->length; }
             )QUILL_IO";
+
+            out << "static char* quill_char_str(char c) {";
+            out << "      char* s = (char*)malloc(2);";
+            out << "      if (s) { s[0] = c; s[1] = '\\0'; }";
+            out << "       return s;";
+            out << "}";
 
 
 
